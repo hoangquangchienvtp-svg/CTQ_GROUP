@@ -1,0 +1,529 @@
+<style>
+    @keyframes ct-spin {
+        0% {
+            transform: rotate(0deg);
+        }
+
+        100% {
+            transform: rotate(360deg);
+        }
+    }
+
+    .ct-spinner {
+        width: 36px;
+        height: 36px;
+        border: 4px solid #dbeafe;
+        border-top: 4px solid #2563eb;
+        border-radius: 50%;
+        animation: ct-spin 0.8s linear infinite;
+        display: inline-block;
+    }
+</style>
+
+<script>
+    var ctTimerInterval = null;
+    var ctSecondsElapsed = 0;
+    var lastMismatchList = [];
+    var currentSrcSheetName = "CHUYÊN CẦN STA5";
+    var currentTgtSheetName = "CHUYỂN CẦN THÁNG 8";
+
+    function renderCopyThuong(container) {
+        // Load defaults: ưu tiên server (ScriptProperties), fallback localStorage
+        var savedSrcUrl = "https://docs.google.com/spreadsheets/d/1_T-OtIZF7_dVXZzTxtXzdLTr5KtWL642SD7kGk8fEH0/edit";
+        var savedSrcSheet = "CHUYÊN CẦN STA5";
+        var savedTgtUrl = "https://docs.google.com/spreadsheets/d/1zURB1fThVmD1bNY0o6XiDUMsTjLu9IjE4H7sZqF1Ing/edit";
+        var savedTgtSheet = "";
+        var isSaved = false;
+
+        // Đọc từ localStorage để hiển thị ngay (tạm thời khi chưa có server data)
+        var lsSaved = localStorage.getItem('CT_SAVE_DEFAULT') === 'true';
+        if (lsSaved) {
+            savedSrcUrl = localStorage.getItem('CT_DEFAULT_SRC_URL') || savedSrcUrl;
+            savedSrcSheet = localStorage.getItem('CT_DEFAULT_SRC_SHEET') || savedSrcSheet;
+            savedTgtUrl = localStorage.getItem('CT_DEFAULT_TARGET_URL') || savedTgtUrl;
+            savedTgtSheet = localStorage.getItem('CT_DEFAULT_SHEET_NAME') || savedTgtSheet;
+            isSaved = true;
+        }
+
+        var html = '';
+        html += '<div style="font-family:\'Segoe UI\',Arial,sans-serif; padding:15px; background:#f8fafc; box-sizing:border-box; width:100%; display:flex; justify-content:center; align-items:flex-start;">';
+        html += '<div style="background:#ffffff; border:1px solid #cbd5e1; border-radius:14px; padding:20px 25px; width:100%; max-width:1600px; box-shadow:0 6px 20px rgba(0,0,0,0.06); box-sizing:border-box;">';
+
+        // TIÊU ĐỀ
+        html += '<h3 style="margin-top:0; color:#1d4ed8; text-align:center; font-weight:900; margin-bottom:15px; font-size:22px; text-transform:uppercase; letter-spacing:0.5px;">🚀 ĐỒNG BỘ DỮ LIỆU CHUYÊN CẦN COPY THƯỞNG</h3>';
+
+        // HÀNG 1: TỪ NGÀY - ĐẾN NGÀY - CA LÀM VIỆC (3 CỘT)
+        html += '<div style="display:flex; gap:15px; margin-bottom:12px;">';
+        html += '<div style="flex:1;">';
+        html += '<label for="ct-startDate" style="display:block; margin-bottom:6px; font-weight:700; font-size:14px; color:#1e293b;">📅 Từ Ngày:</label>';
+        html += '<input type="date" id="ct-startDate" style="width:100%; padding:9px 12px; box-sizing:border-box; border:1.5px solid #cbd5e1; border-radius:6px; font-size:14px; color:#0f172a; outline:none;">';
+        html += '</div>';
+        html += '<div style="flex:1;">';
+        html += '<label for="ct-endDate" style="display:block; margin-bottom:6px; font-weight:700; font-size:14px; color:#1e293b;">📅 Đến Ngày (Để trống nếu copy 1 ngày):</label>';
+        html += '<input type="date" id="ct-endDate" style="width:100%; padding:9px 12px; box-sizing:border-box; border:1.5px solid #cbd5e1; border-radius:6px; font-size:14px; color:#0f172a; outline:none;">';
+        html += '</div>';
+        html += '<div style="flex:1;">';
+        html += '<label for="ct-selectCa" style="display:block; margin-bottom:6px; font-weight:700; font-size:14px; color:#1e293b;">⏰ Chọn Ca làm việc:</label>';
+        html += '<select id="ct-selectCa" style="width:100%; padding:9px 12px; box-sizing:border-box; border:1.5px solid #cbd5e1; border-radius:6px; font-size:14px; color:#0f172a; outline:none;">';
+        html += '<option value="ALL">-- Tất cả các Ca --</option>';
+        html += '<option value="Day">Day (Ca ngày)</option>';
+        html += '<option value="Night">Night (Ca đêm)</option>';
+        html += '</select>';
+        html += '</div>';
+        html += '</div>';
+
+        // HÀNG 2: LINK & TÊN SHEET NGUỒN (YÊU CẦU 5)
+        html += '<div style="display:flex; gap:15px; margin-bottom:12px;">';
+        html += '<div style="flex:2;">';
+        html += '<label for="ct-sourceUrl" style="display:block; margin-bottom:6px; font-weight:700; font-size:14px; color:#1e293b;">🔗 Link Google Sheet Nguồn:</label>';
+        html += '<input type="text" id="ct-sourceUrl" value="' + savedSrcUrl + '" oninput="saveCurrentDefaults()" placeholder="Dán Link Google Sheet Nguồn vào đây..." style="width:100%; padding:9px 12px; box-sizing:border-box; border:1.5px solid #cbd5e1; border-radius:6px; font-size:14px; color:#0f172a; outline:none;">';
+        html += '</div>';
+        html += '<div style="flex:1;">';
+        html += '<label for="ct-sourceSheetName" style="display:block; margin-bottom:6px; font-weight:700; font-size:14px; color:#1e293b;">📄 Tên Sheet Nguồn:</label>';
+        html += '<input type="text" id="ct-sourceSheetName" value="' + savedSrcSheet + '" oninput="saveCurrentDefaults()" placeholder="Ví dụ: CHUYÊN CẦN STA5..." style="width:100%; padding:9px 12px; box-sizing:border-box; border:1.5px solid #cbd5e1; border-radius:6px; font-size:14px; color:#0f172a; outline:none;">';
+        html += '</div>';
+        html += '</div>';
+
+        // HÀNG 3: LINK & TÊN SHEET ĐÍCH
+        html += '<div style="display:flex; gap:15px; margin-bottom:12px;">';
+        html += '<div style="flex:2;">';
+        html += '<label for="ct-targetUrl" style="display:block; margin-bottom:6px; font-weight:700; font-size:14px; color:#1e293b;">🔗 Link Google Sheet Đích (cần dán vào):</label>';
+        html += '<input type="text" id="ct-targetUrl" value="' + savedTgtUrl + '" oninput="saveCurrentDefaults()" placeholder="Dán đường dẫn Link Google Sheet Đích vào đây..." style="width:100%; padding:9px 12px; box-sizing:border-box; border:1.5px solid #cbd5e1; border-radius:6px; font-size:14px; color:#0f172a; outline:none;">';
+        html += '</div>';
+        html += '<div style="flex:1;">';
+        html += '<label for="ct-customSheetName" style="display:block; margin-bottom:6px; font-weight:700; font-size:14px; color:#1e293b;">📄 Tên Sheet Đích (Tùy chọn):</label>';
+        html += '<input type="text" id="ct-customSheetName" value="' + savedTgtSheet + '" oninput="saveCurrentDefaults()" placeholder="Ví dụ: CHUYỂN CẦN THÁNG 8..." style="width:100%; padding:9px 12px; box-sizing:border-box; border:1.5px solid #cbd5e1; border-radius:6px; font-size:14px; color:#0f172a; outline:none;">';
+        html += '</div>';
+        html += '</div>';
+
+        // Ô TÍCH MẶC ĐỊNH & NÚT BẮT ĐẦU
+        html += '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; background:#eff6ff; padding:10px 15px; border-radius:8px; border:1px solid #bfdbfe;">';
+        html += '<div style="display:flex; align-items:center; gap:8px;">';
+        html += '<input type="checkbox" id="ct-saveDefault" ' + (isSaved ? 'checked' : '') + ' onchange="saveCurrentDefaults()" style="width:18px; height:18px; cursor:pointer;">';
+        html += '<label for="ct-saveDefault" style="font-weight:700; font-size:14px; color:#1d4ed8; cursor:pointer;">📌 Đặt Link & Tên Sheet Nguồn + Đích này làm MẶC ĐỊNH (Giữ nguyên không xóa khi thoát)</label>';
+        html += '</div>';
+        html += '<button onclick="submitCopyThuongData(false)" style="padding:12px 30px; background:linear-gradient(180deg, #2563eb 0%, #1d4ed8 100%); color:white; border:none; border-radius:8px; font-weight:900; cursor:pointer; font-size:16px; box-shadow:0 4px 12px rgba(37,99,235,0.3); transition:all 0.2s;">🚀 BẮT ĐẦU COPY DỮ LIỆU</button>';
+        html += '</div>';
+
+        html += '<div id="ct-status" style="margin-top:15px; font-size:14px; font-weight:600; text-align:left; word-wrap:break-word; padding:12px 15px; border-radius:10px; display:none; line-height:1.6;"></div>';
+
+        // VÙNG HIỂN THỊ BẢNG ĐỐI CHIẾU HÀNG BÁO "SAI"
+        html += '<div id="ct-mismatch-area" style="margin-top:15px; display:none;"></div>';
+
+        html += '</div></div>';
+
+        container.innerHTML = html;
+
+        // Set ngày mặc định là hôm nay
+        var startDateInput = document.getElementById('ct-startDate');
+        if (startDateInput) {
+            var today = new Date();
+            var yyyy = today.getFullYear();
+            var mm = String(today.getMonth() + 1).padStart(2, '0');
+            var dd = String(today.getDate()).padStart(2, '0');
+            startDateInput.value = yyyy + '-' + mm + '-' + dd;
+        }
+
+        // Tải cài đặt mặc định từ SERVER (ScriptProperties) - chia sẻ qua mọi máy/user
+        if (typeof google !== 'undefined' && google.script && google.script.run) {
+            google.script.run
+                .withSuccessHandler(function (res) {
+                    if (res && res.success && res.data) {
+                        try {
+                            var sv = JSON.parse(res.data);
+                            if (sv.srcUrl) { var el = document.getElementById('ct-sourceUrl'); if (el) el.value = sv.srcUrl; }
+                            if (sv.srcSheet) { var el = document.getElementById('ct-sourceSheetName'); if (el) el.value = sv.srcSheet; }
+                            if (sv.tgtUrl) { var el = document.getElementById('ct-targetUrl'); if (el) el.value = sv.tgtUrl; }
+                            if (sv.tgtSheet !== undefined) { var el = document.getElementById('ct-customSheetName'); if (el) el.value = sv.tgtSheet; }
+                            var cbx = document.getElementById('ct-saveDefault');
+                            if (cbx) cbx.checked = true;
+                            // Đồng bộ sang localStorage để dùng offline nếu cần
+                            localStorage.setItem('CT_SAVE_DEFAULT', 'true');
+                            localStorage.setItem('CT_DEFAULT_SRC_URL', sv.srcUrl || '');
+                            localStorage.setItem('CT_DEFAULT_SRC_SHEET', sv.srcSheet || '');
+                            localStorage.setItem('CT_DEFAULT_TARGET_URL', sv.tgtUrl || '');
+                            localStorage.setItem('CT_DEFAULT_SHEET_NAME', sv.tgtSheet || '');
+                        } catch (e) { }
+                    }
+                })
+                .withFailureHandler(function () { })
+                .getCopyDefaultsFromServer();
+        }
+    }
+
+    function saveCurrentDefaults() {
+        var isChecked = document.getElementById('ct-saveDefault').checked;
+        if (isChecked) {
+            var settings = {
+                srcUrl: document.getElementById('ct-sourceUrl').value,
+                srcSheet: document.getElementById('ct-sourceSheetName').value,
+                tgtUrl: document.getElementById('ct-targetUrl').value,
+                tgtSheet: document.getElementById('ct-customSheetName').value
+            };
+            var settingsJson = JSON.stringify(settings);
+            // Lưu localStorage (nhanh, offline)
+            localStorage.setItem('CT_SAVE_DEFAULT', 'true');
+            localStorage.setItem('CT_DEFAULT_SRC_URL', settings.srcUrl);
+            localStorage.setItem('CT_DEFAULT_SRC_SHEET', settings.srcSheet);
+            localStorage.setItem('CT_DEFAULT_TARGET_URL', settings.tgtUrl);
+            localStorage.setItem('CT_DEFAULT_SHEET_NAME', settings.tgtSheet);
+            // Lưu lên SERVER (ScriptProperties) - chia sẻ qua mọi máy/user
+            if (typeof google !== 'undefined' && google.script && google.script.run) {
+                google.script.run
+                    .withSuccessHandler(function () { })
+                    .withFailureHandler(function () { })
+                    .saveCopyDefaultsToServer(settingsJson);
+            }
+        } else {
+            localStorage.removeItem('CT_SAVE_DEFAULT');
+            localStorage.removeItem('CT_DEFAULT_SRC_URL');
+            localStorage.removeItem('CT_DEFAULT_SRC_SHEET');
+            localStorage.removeItem('CT_DEFAULT_TARGET_URL');
+            localStorage.removeItem('CT_DEFAULT_SHEET_NAME');
+            // Xóa trên SERVER
+            if (typeof google !== 'undefined' && google.script && google.script.run) {
+                google.script.run
+                    .withSuccessHandler(function () { })
+                    .withFailureHandler(function () { })
+                    .saveCopyDefaultsToServer('');
+            }
+        }
+    }
+
+    function submitCopyThuongData(forcePaste) {
+        saveCurrentDefaults();
+
+        var startDateVal = document.getElementById('ct-startDate').value;
+        var endDateVal = document.getElementById('ct-endDate').value || startDateVal;
+        var ca = document.getElementById('ct-selectCa').value;
+        var sourceUrl = document.getElementById('ct-sourceUrl').value;
+        var sourceSheetName = document.getElementById('ct-sourceSheetName').value;
+        var targetUrl = document.getElementById('ct-targetUrl').value;
+        var customSheetName = document.getElementById('ct-customSheetName').value;
+        var statusDiv = document.getElementById('ct-status');
+        var mismatchArea = document.getElementById('ct-mismatch-area');
+
+        statusDiv.style.display = 'block';
+        mismatchArea.style.display = 'none';
+        mismatchArea.innerHTML = '';
+        lastMismatchList = [];
+
+        if (!startDateVal) {
+            statusDiv.style.color = '#dc2626';
+            statusDiv.style.backgroundColor = '#fee2e2';
+            statusDiv.style.border = '1.5px solid #fca5a5';
+            statusDiv.innerHTML = '⚠️ Vui lòng chọn ngày bắt đầu!';
+            return;
+        }
+
+        var start = new Date(startDateVal);
+        var end = new Date(endDateVal);
+        if (end < start) end = new Date(startDateVal);
+
+        var datesArray = [];
+        var curr = new Date(start);
+        while (curr <= end) {
+            var yyyy = curr.getFullYear();
+            var mm = String(curr.getMonth() + 1).padStart(2, '0');
+            var dd = String(curr.getDate()).padStart(2, '0');
+            datesArray.push(dd + '/' + mm + '/' + yyyy);
+            curr.setDate(curr.getDate() + 1);
+        }
+
+        if (ctTimerInterval) clearInterval(ctTimerInterval);
+        ctSecondsElapsed = 0;
+
+        statusDiv.style.color = '#1e40af';
+        statusDiv.style.backgroundColor = '#f0f9ff';
+        statusDiv.style.border = '1.5px solid #93c5fd';
+
+        function updateLoaderUI() {
+            statusDiv.innerHTML = `
+            <div style="display:flex; align-items:center; justify-content:center; gap:15px; padding:15px; background:#eff6ff; border:1.5px dashed #3b82f6; border-radius:10px;">
+                <div class="ct-spinner"></div>
+                <div>
+                    <div style="font-size:17px; font-weight:800; color:#1e40af;">⏳ ĐANG TIẾN HÀNH ĐỒNG BỘ DỮ LIỆU...</div>
+                    <div style="font-size:14px; color:#1d4ed8; margin-top:4px;">Đang xử lý <b>${datesArray.length} ngày</b> (${datesArray[0]} đến ${datesArray[datesArray.length - 1]})</div>
+                    <div style="font-size:15px; font-weight:800; color:#2563eb; margin-top:4px;">⏱️ Thời gian đã chạy: <span style="font-size:20px; color:#1d4ed8; font-weight:900;">${ctSecondsElapsed}</span> giây</div>
+                </div>
+            </div>
+        `;
+        }
+
+        updateLoaderUI();
+        ctTimerInterval = setInterval(function () {
+            ctSecondsElapsed++;
+            updateLoaderUI();
+        }, 1000);
+
+        google.script.run
+            .withSuccessHandler(function (res) {
+                if (ctTimerInterval) clearInterval(ctTimerInterval);
+
+                if (res.success) {
+                    if (res.srcSheetName) currentSrcSheetName = res.srcSheetName;
+                    if (res.tgtSheetName) currentTgtSheetName = res.tgtSheetName;
+
+                    // XỬ LÝ CẢNH BÁO LỆCH SỐ LƯỢNG HÀNG THEO TRẠM (YÊU CẦU 6)
+                    if (res.capacityWarning && res.capacityWarnings && res.capacityWarnings.length > 0) {
+                        statusDiv.style.color = '#be123c';
+                        statusDiv.style.backgroundColor = '#fff1f2';
+                        statusDiv.style.border = '2px solid #f43f5e';
+
+                        var warnItemsHtml = '';
+                        for (var w = 0; w < res.capacityWarnings.length; w++) {
+                            var warn = res.capacityWarnings[w];
+                            warnItemsHtml += `
+                            <div style="margin-bottom:8px; font-size:14.5px; color:#9f1239; font-weight:800;">
+                                📌 <b>Trạm "${warn.station}"</b> (Ca ${warn.ca}): Sheet ${currentSrcSheetName} có <b style="color:#2563eb; font-size:16px;">${warn.srcCount} người</b> ➔ Sheet ${currentTgtSheetName} chỉ có <b style="color:#dc2626; font-size:16px;">${warn.tgtCount} hàng</b> (Thiếu <b style="color:#dc2626;">${warn.diff} hàng</b>!)
+                            </div>
+                        `;
+                        }
+
+                        var warnCard = `
+                        <div style="padding:10px;">
+                            <div style="display:flex; align-items:center; gap:12px; margin-bottom:12px;">
+                                <div style="font-size:42px;">🚨</div>
+                                <div>
+                                    <h3 style="margin:0; color:#be123c; font-weight:900; font-size:18px; text-transform:uppercase;">⚠️ CẢNH BÁO LỆCH SỐ LƯỢNG HÀNG THEO TRẠM!</h3>
+                                    <div style="color:#9f1239; font-size:14px; font-weight:700; margin-top:2px;">Sheet ${currentSrcSheetName} có số người ở trạm nhiều hơn số hàng có sẵn trên Sheet ${currentTgtSheetName}. Hệ thống đã <b>TẠM DỪNG DÁN</b> để bạn kiểm tra:</div>
+                                </div>
+                            </div>
+
+                            <div style="background:#ffffff; border:1.5px solid #fecdd3; border-radius:10px; padding:12px 16px; margin-bottom:15px;">
+                                ${warnItemsHtml}
+                            </div>
+
+                            <div style="display:flex; gap:15px; justify-content:flex-end;">
+                                <button onclick="cancelCopyAction()" style="padding:10px 20px; background:#64748b; color:white; border:none; border-radius:8px; font-weight:800; cursor:pointer; font-size:14px;">❌ HỦY ĐỂ KIỂM TRA LẠI FILE</button>
+                                <button onclick="submitCopyThuongData(true)" style="padding:10px 25px; background:linear-gradient(180deg, #dc2626 0%, #991b1b 100%); color:white; border:none; border-radius:8px; font-weight:900; cursor:pointer; font-size:14px; box-shadow:0 4px 12px rgba(220,38,38,0.3);">⚡ VẪN TIẾP TỤC DÁN BẤT CHẤP LỆCH</button>
+                            </div>
+                        </div>
+                    `;
+
+                        statusDiv.innerHTML = warnCard;
+                        return;
+                    }
+
+                    // DÁN THÀNH CÔNG THÔNG THƯỜNG
+                    statusDiv.style.color = '#166534';
+                    statusDiv.style.backgroundColor = '#f0fdf4';
+                    statusDiv.style.border = '1.5px solid #86efac';
+
+                    var giantOkBanner = `
+                    <div style="text-align:center; padding:15px; background:#dcfce7; border:2px solid #22c55e; border-radius:12px; margin-bottom:12px; box-shadow:0 4px 15px rgba(34,197,94,0.12);">
+                        <div style="font-size:55px; font-weight:900; color:#15803d; line-height:1; letter-spacing:2px;">✅ OK</div>
+                        <div style="font-size:20px; font-weight:900; color:#166534; margin-top:6px; text-transform:uppercase;">ĐỒNG BỘ HOÀN TẤT THÀNH CÔNG!</div>
+                        <div style="font-size:15px; font-weight:700; color:#15803d; margin-top:4px;">⏱️ Tổng thời gian thực thi: <b>${ctSecondsElapsed} giây</b></div>
+                    </div>
+                `;
+
+                    statusDiv.innerHTML = giantOkBanner + '<div style="font-size:14.5px; line-height:1.6;">' + res.message + '</div>';
+
+                    if (res.mismatchList && res.mismatchList.length > 0) {
+                        lastMismatchList = res.mismatchList;
+                        renderMismatchTable(res.mismatchList, currentSrcSheetName, currentTgtSheetName);
+                    }
+
+                } else {
+                    statusDiv.style.color = '#991b1b';
+                    statusDiv.style.backgroundColor = '#fee2e2';
+                    statusDiv.style.border = '1.5px solid #fca5a5';
+                    statusDiv.innerHTML = '❌ <b style="font-size:18px;">Lỗi thực thi:</b><br><br>' + res.message;
+                }
+            })
+            .withFailureHandler(function (err) {
+                if (ctTimerInterval) clearInterval(ctTimerInterval);
+                statusDiv.style.color = '#991b1b';
+                statusDiv.style.backgroundColor = '#fee2e2';
+                statusDiv.style.border = '1.5px solid #fca5a5';
+                statusDiv.innerHTML = '❌ <b style="font-size:18px;">Lỗi kết nối máy chủ:</b><br><br>' + (err.message || err);
+            })
+            .processCopyData(datesArray, ca, targetUrl, customSheetName, forcePaste, sourceUrl, sourceSheetName);
+    }
+
+    function cancelCopyAction() {
+        var statusDiv = document.getElementById('ct-status');
+        if (statusDiv) {
+            statusDiv.style.display = 'none';
+            statusDiv.innerHTML = '';
+        }
+    }
+
+    // BẢNG ĐỐI CHIẾU CHI TIẾT VÀ NÚT KHỚP TỪNG DÒNG (CHỮ TO, RỘNG RÃI, TÊN SHEET RÕ RÀNG)
+    function renderMismatchTable(list, srcSheetName, tgtSheetName) {
+        srcSheetName = srcSheetName || currentSrcSheetName || "CHUYÊN CẦN STA5";
+        tgtSheetName = tgtSheetName || currentTgtSheetName || "CHUYỂN CẦN THÁNG 8";
+
+        var area = document.getElementById('ct-mismatch-area');
+        area.style.display = 'block';
+
+        var html = '';
+        html += '<div style="background:#ffffff; border:2.5px solid #ef4444; border-radius:14px; padding:20px; box-shadow:0 8px 25px rgba(239,68,68,0.15); width:100%; box-sizing:border-box;">';
+        html += '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">';
+        html += '<h4 style="margin:0; color:#dc2626; font-size:20px; font-weight:900; text-transform:uppercase; letter-spacing:0.5px;">';
+        html += '⚠️ BẢNG ĐỐI CHIẾU HÀNG BÁO "SAI" (' + list.length + ' VỊ TRÍ PHÁT HIỆN LỆCH)';
+        html += '</h4>';
+        html += '<button id="ct-btnFixAll" onclick="submitFixAllMismatch()" style="padding:11px 24px; background:linear-gradient(180deg, #16a34a 0%, #15803d 100%); color:white; border:none; border-radius:8px; font-weight:900; cursor:pointer; font-size:15px; box-shadow:0 4px 12px rgba(22,163,74,0.3); transition:all 0.2s;">⚡ KHỚP TẤT CẢ CÁC HÀNG BÁO SAI</button>';
+        html += '</div>';
+
+        html += '<div style="overflow-x:auto; max-height:280px; border:1.5px solid #cbd5e1; border-radius:10px;">';
+        html += '<table style="width:100%; border-collapse:collapse; font-size:15px; text-align:left;">';
+        html += '<thead>';
+        html += '<tr style="background:#fee2e2; color:#991b1b; font-weight:900; font-size:15px; position:sticky; top:0; z-index:10;">';
+        html += '<th style="padding:12px 14px; border:1px solid #fca5a5; font-size:15px;">MÃ THẺ (' + srcSheetName + ')</th>';
+        html += '<th style="padding:12px 14px; border:1px solid #fca5a5; font-size:15px;">HỌ VÀ TÊN (' + srcSheetName + ')</th>';
+        html += '<th style="padding:12px 14px; border:1px solid #fca5a5; font-size:15px;">TRẠM & LINE (' + srcSheetName + ')</th>';
+        html += '<th style="padding:12px 14px; border:1px solid #fca5a5; font-size:15px;">HÀNG (' + tgtSheetName + ')</th>';
+        html += '<th style="padding:12px 14px; border:1px solid #fca5a5; font-size:15px;">TRẠM & LINE (' + tgtSheetName + ')</th>';
+        html += '<th style="padding:12px 14px; border:1px solid #fca5a5; text-align:center; white-space:nowrap; width:150px; font-size:15px;">TRẠNG THÁI</th>';
+        html += '<th style="padding:12px 14px; border:1px solid #fca5a5; text-align:center; white-space:nowrap; width:150px; font-size:15px;">HÀNH ĐỘNG</th>';
+        html += '</tr>';
+        html += '</thead>';
+        html += '<tbody>';
+
+        for (var i = 0; i < list.length; i++) {
+            var item = list[i];
+            var bgRow = (i % 2 === 0) ? '#ffffff' : '#fff5f5';
+            var isReverse = (item.type === 'REVERSE_MISMATCH');
+            var isLineStationMismatch = (item.type === 'MISMATCH_LINE_STATION');
+
+            html += '<tr id="ct-row-' + i + '" style="background:' + bgRow + '; border-bottom:1px solid #fee2e2;">';
+            html += '<td style="padding:12px 14px; font-weight:800; color:' + (isReverse ? '#d97706' : (isLineStationMismatch ? '#e11d48' : '#1d4ed8')) + '; font-size:15px;">' + item.srcId + '</td>';
+            html += '<td style="padding:12px 14px; font-weight:700; color:#0f172a; font-size:15px;">' + item.srcName + '</td>';
+            html += '<td style="padding:12px 14px; color:#334155; font-size:14.5px;">' + (item.srcStation || 'N/A') + '</td>';
+            html += '<td style="padding:12px 14px; font-weight:900; color:#dc2626; font-size:15px;">Hàng ' + item.targetRow + '</td>';
+            html += '<td style="padding:12px 14px; color:#334155; font-size:14.5px;">' + item.tgtStation + '</td>';
+
+            // CỘT TRẠNG THÁI (NHÃN RÕ RÀNG VỚI TÊN SHEET)
+            html += '<td id="ct-status-cell-' + i + '" style="padding:12px 14px; text-align:center; white-space:nowrap;">';
+            if (isReverse) {
+                html += '<span style="display:inline-block; padding:5px 12px; background:#fef3c7; color:#b45309; border:1px solid #fde68a; border-radius:14px; font-weight:800; font-size:13px; white-space:nowrap;">⚠️ ' + tgtSheetName + ' có - ' + srcSheetName + ' thiếu</span>';
+            } else if (isLineStationMismatch) {
+                html += '<span style="display:inline-block; padding:5px 12px; background:#ffe4e6; color:#e11d48; border:1px solid #fda4af; border-radius:14px; font-weight:800; font-size:13px; white-space:nowrap;">⚠️ Khác Line / Trạm</span>';
+            } else {
+                html += '<span style="display:inline-block; padding:5px 12px; background:#fee2e2; color:#dc2626; border:1px solid #fca5a5; border-radius:14px; font-weight:800; font-size:13px; white-space:nowrap;">⚠️ Báo Sai</span>';
+            }
+            html += '</td>';
+
+            // CỘT NÚT BẤM KHỚP TỪNG DÒNG (CHỮ TO NỔI BẬT)
+            html += '<td id="ct-action-cell-' + i + '" style="padding:12px 14px; text-align:center; white-space:nowrap;">';
+            html += '<button id="ct-rowbtn-' + i + '" onclick="submitFixSingleRow(' + i + ')" style="padding:8px 16px; background:#16a34a; color:white; border:none; border-radius:8px; font-weight:900; font-size:14px; cursor:pointer; white-space:nowrap; box-shadow:0 3px 8px rgba(0,0,0,0.12);">⚡ Khớp Dòng Này</button>';
+            html += '</td>';
+
+            html += '</tr>';
+        }
+
+        html += '</tbody></table></div>';
+        html += '</div>';
+
+        area.innerHTML = html;
+    }
+
+    // HÀM KHỚP DÒNG ĐƠN ĐỘC KHI NGUỜI DÙNG BẤM "⚡ KHỚP DÒNG NÀY"
+    function submitFixSingleRow(idx) {
+        if (!lastMismatchList || !lastMismatchList[idx]) return;
+
+        var item = lastMismatchList[idx];
+        var sourceUrl = document.getElementById('ct-sourceUrl').value;
+        var sourceSheetName = document.getElementById('ct-sourceSheetName').value;
+        var targetUrl = document.getElementById('ct-targetUrl').value;
+        var customSheetName = document.getElementById('ct-customSheetName').value;
+
+        var btn = document.getElementById('ct-rowbtn-' + idx);
+        var statusCell = document.getElementById('ct-status-cell-' + idx);
+        var actionCell = document.getElementById('ct-action-cell-' + idx);
+
+        if (btn) {
+            btn.disabled = true;
+            btn.style.background = '#94a3b8';
+            btn.innerText = '⏳ Đang di chuyển & khớp...';
+        }
+
+        google.script.run
+            .withSuccessHandler(function (res) {
+                if (res.success) {
+                    if (statusCell) {
+                        statusCell.innerHTML = '<span style="display:inline-block; padding:5px 12px; background:#dcfce7; color:#15803d; border:1px solid #86efac; border-radius:14px; font-weight:900; font-size:13px; white-space:nowrap;">✅ Đã Khớp Về Đúng Trạm</span>';
+                    }
+                    if (actionCell) {
+                        actionCell.innerHTML = '<span style="color:#15803d; font-weight:900; font-size:14px;">✅ ĐÃ KHỚP</span>';
+                    }
+                    alert(res.message);
+                } else {
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.style.background = '#16a34a';
+                        btn.innerText = '⚡ Khớp Dòng Này';
+                    }
+                    alert("Lỗi: " + res.message);
+                }
+            })
+            .withFailureHandler(function (err) {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.style.background = '#16a34a';
+                    btn.innerText = '⚡ Khớp Dòng Này';
+                }
+                alert("Lỗi kết nối: " + (err.message || err));
+            })
+            .fixSingleMismatchRow(item, targetUrl, customSheetName, sourceUrl, sourceSheetName);
+    }
+
+    // HÀM KHỚP TẤT CẢ CÁC HÀNG BÁO SAI
+    function submitFixAllMismatch() {
+        if (!lastMismatchList || lastMismatchList.length === 0) {
+            alert("Không có hàng báo Sai nào để khớp!");
+            return;
+        }
+
+        var sourceUrl = document.getElementById('ct-sourceUrl').value;
+        var sourceSheetName = document.getElementById('ct-sourceSheetName').value;
+        var targetUrl = document.getElementById('ct-targetUrl').value;
+        var customSheetName = document.getElementById('ct-customSheetName').value;
+        var btnFixAll = document.getElementById('ct-btnFixAll');
+
+        if (btnFixAll) {
+            btnFixAll.disabled = true;
+            btnFixAll.style.background = '#94a3b8';
+            btnFixAll.innerText = '⏳ ĐANG TỰ ĐỘNG KHỚP & ĐIỀU CHỈNH TẤT CẢ CÁC HÀNG...';
+        }
+
+        google.script.run
+            .withSuccessHandler(function (res) {
+                if (res.success) {
+                    if (btnFixAll) {
+                        btnFixAll.style.background = '#15803d';
+                        btnFixAll.innerText = '✅ ĐÃ KHỚP THÀNH CÔNG HOÀN TẤT ALL HÀNG!';
+                    }
+                    for (var i = 0; i < lastMismatchList.length; i++) {
+                        var statusCell = document.getElementById('ct-status-cell-' + i);
+                        var actionCell = document.getElementById('ct-action-cell-' + i);
+                        if (statusCell) {
+                            statusCell.innerHTML = '<span style="display:inline-block; padding:5px 12px; background:#dcfce7; color:#15803d; border:1px solid #86efac; border-radius:14px; font-weight:900; font-size:13px; white-space:nowrap;">✅ Đã Khớp</span>';
+                        }
+                        if (actionCell) {
+                            actionCell.innerHTML = '<span style="color:#15803d; font-weight:900; font-size:14px;">✅ ĐÃ KHỚP</span>';
+                        }
+                    }
+                    alert(res.message);
+                } else {
+                    if (btnFixAll) {
+                        btnFixAll.disabled = false;
+                        btnFixAll.style.background = 'linear-gradient(180deg, #16a34a 0%, #15803d 100%)';
+                        btnFixAll.innerText = '⚡ KHỚP TẤT CẢ CÁC HÀNG BÁO SAI';
+                    }
+                    alert("Lỗi: " + res.message);
+                }
+            })
+            .withFailureHandler(function (err) {
+                if (btnFixAll) {
+                    btnFixAll.disabled = false;
+                    btnFixAll.style.background = 'linear-gradient(180deg, #16a34a 0%, #15803d 100%)';
+                    btnFixAll.innerText = '⚡ KHỚP TẤT CẢ CÁC HÀNG BÁO SAI';
+                }
+                alert("Lỗi kết nối máy chủ: " + (err.message || err));
+            })
+            .fixMismatchRows(lastMismatchList, targetUrl, customSheetName, sourceUrl, sourceSheetName);
+    }
+</script>

@@ -1,0 +1,832 @@
+<script>
+    // ==========================================
+    // MODULE: TIẾN ĐỘ CTQ
+    // ==========================================
+    window.TienDoData = { stations: [], people: [], checks: {} };
+    let tdChartInstance = null;
+
+    function tdHasPerm(p) {
+        let perms = window.USER_PERMS ? window.USER_PERMS.split(',').map(s => s.trim()) : [];
+        return perms.includes(p);
+    }
+
+    function initTienDoCTQ() {
+        let tab = document.getElementById('tab-tien-do-ctq');
+        if (!tab) return;
+
+        tab.innerHTML = `
+            <style>
+            .td-btn-modern { background: #0ea5e9; color: white; border: none; border-radius: 6px; padding: 6px 14px; font-size: 13px; font-weight: 600; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-left: 5px; }
+            .td-btn-modern:hover { opacity: 0.9; transform: translateY(-1px); }
+            .td-btn-add-m { background: #10b981; }
+            .td-btn-del-m { background: #ef4444; }
+            .td-check-lg { width: 22px; height: 22px; accent-color: #059669; pointer-events: none; }
+            .td-cell-click { cursor: pointer; text-align: center; vertical-align: middle !important; }
+            .td-cell-click:hover { background: #f1f5f9; }
+            .td-stat-box-modern { font-size: 13px; font-weight: bold; margin-bottom: 4px; border-radius: 4px; padding: 4px; text-align: center; }
+            </style>
+            <div style="display:flex; justify-content:space-between; align-items:flex-end; border-bottom:2px solid #e2e8f0; margin-bottom:8px; padding-bottom:0px;">
+                <div class="td-tabs" style="border-bottom:none; margin-bottom:0; padding-bottom:0;">
+                    <div id="td-tab-chitiet" class="td-tab-btn active" data-lang="td_tab_chitiet" onclick="switchTienDoSubTab('chitiet')">📊 Chi Tiết Tiến Độ</div>
+                    <div id="td-tab-tongquan" class="td-tab-btn" data-lang="td_tab_tongquan" onclick="switchTienDoSubTab('tongquan')">🏆 Tổng Quan & Xếp Hạng</div>
+                </div>
+                <div style="padding-bottom:5px; display:flex;">
+                    <button class="td-btn-modern td-btn-del-m" style="margin-right:15px;" onclick="tdClearAllTicks()">- Xóa Tích</button>
+                    <button class="td-btn-modern td-btn-add-m" data-lang="td_btn_add_station" onclick="tdAddStation()">+ Thêm Trạm</button>
+                    <button class="td-btn-modern td-btn-add-m" data-lang="td_btn_add_person" onclick="tdAddPerson()">+ Thêm Người</button>
+                    <button class="td-btn-modern td-btn-del-m" data-lang="td_btn_del_station" onclick="tdShowDeleteModal('station')">- Xóa Trạm</button>
+                    <button class="td-btn-modern td-btn-del-m" data-lang="td_btn_del_person" onclick="tdShowDeleteModal('person')">- Xóa Người</button>
+                    <button class="td-btn-modern" data-lang="td_btn_reload" onclick="loadTienDoCTQ()" style="margin-left:15px;">🔄 Tải Lại Dữ Liệu</button>
+                    <button class="td-btn-modern" data-lang="td_btn_capture" onclick="tdCaptureTable()" style="margin-left:5px; background:#f59e0b;">📸 Chụp Ảnh</button>
+                </div>
+            </div>
+
+            <div id="td-view-chitiet">
+                <div style="margin-bottom:8px;">
+                    <div style="color:#64748b; font-size:13px; font-weight:500;">
+                        <span data-lang="td_note"><span style="color:#ef4444; font-weight:bold;">* Lưu ý:</span> Click thẳng vào ô để tích. Tự động đồng bộ ngầm.</span>
+                    </div>
+                </div>
+                <div class="td-matrix-container" id="td-matrix-render">
+                    <div style="padding:20px; text-align:center; color:#64748b;">Đang tải dữ liệu...</div>
+                </div>
+            </div>
+
+            <div id="td-view-tongquan" style="display:none;">
+                <div class="td-tq-grid" id="td-tq-render"></div>
+                <div class="td-chart-wrapper">
+                    <div class="td-tq-title" data-lang="td_chart_title">📊 Biểu Đồ Tỷ Lệ Hoàn Thành Học Trạm Của Từng Người</div>
+                    <div id="td-chart-div" style="width:100%; height:400px;"></div>
+                </div>
+            </div>
+
+            <!-- Modal Thêm Nhiều Dữ Liệu -->
+            <div id="td-modal-add" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:9999; justify-content:center; align-items:center;">
+                <div style="background:#fff; width:500px; max-width:95%; border-radius:12px; padding:20px; box-shadow:0 10px 25px rgba(0,0,0,0.2);">
+                    <div id="td-modal-title" style="font-size:18px; font-weight:bold; margin-bottom:10px; color:#1e293b;">Nhập Dữ Liệu</div>
+                    <div id="td-modal-body"></div>
+                    <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:10px;">
+                        <button class="td-btn-modern" style="background:#64748b; box-shadow:none;" onclick="document.getElementById('td-modal-add').style.display='none'">Hủy Bỏ</button>
+                        <button class="td-btn-modern td-btn-add-m" id="td-modal-save">Xác Nhận Thêm</button>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        loadTienDoCTQ();
+    }
+
+    function switchTienDoSubTab(tabName) {
+        document.getElementById('td-tab-chitiet').classList.remove('active');
+        document.getElementById('td-tab-tongquan').classList.remove('active');
+        document.getElementById('td-view-chitiet').style.display = 'none';
+        document.getElementById('td-view-tongquan').style.display = 'none';
+
+        if (tabName === 'chitiet') {
+            document.getElementById('td-tab-chitiet').classList.add('active');
+            document.getElementById('td-view-chitiet').style.display = 'block';
+        } else {
+            document.getElementById('td-tab-tongquan').classList.add('active');
+            document.getElementById('td-view-tongquan').style.display = 'block';
+            renderTienDoTongQuan();
+        }
+    }
+
+    function loadTienDoCTQ() {
+        if (!tdHasPerm('tien-do-ctq') && !tdHasPerm('admin')) {
+            document.getElementById('td-matrix-render').innerHTML = '<div style="padding:20px; text-align:center; color:red; font-weight:bold;">Bạn không có quyền xem chức năng này!</div>';
+            return;
+        }
+
+        showToast('Đang tải dữ liệu Tiến Độ...', 'warning');
+        google.script.run.withSuccessHandler(function (res) {
+            if (res) {
+                try {
+                    window.TienDoData = JSON.parse(res);
+                    if (!window.TienDoData.stations) window.TienDoData.stations = [];
+                    if (!window.TienDoData.people) window.TienDoData.people = [];
+                    if (!window.TienDoData.checks) window.TienDoData.checks = {};
+                } catch (e) {
+                    window.TienDoData = { stations: [], people: [], checks: {} };
+                }
+            }
+            renderTienDoMatrix();
+            showToast('Đã tải xong dữ liệu!', 'success');
+        }).withFailureHandler(function (err) {
+            showToast('Lỗi tải dữ liệu Tiến Độ: ' + err, 'error');
+        }).loadTienDoCTQData();
+    }
+
+    function renderTienDoMatrix() {
+        let container = document.getElementById('td-matrix-render');
+        let d = window.TienDoData;
+
+        if (d.stations.length === 0 && d.people.length === 0) {
+            container.innerHTML = '<div style="padding:40px; text-align:center; color:#64748b; font-weight:bold;">Chưa có dữ liệu. Vui lòng thêm Trạm và Người để bắt đầu!</div>';
+            return;
+        }
+
+        let html = '<table class="td-table"><thead><tr>';
+        html += `<th class="td-col-fixed" data-lang="td_th_tram" style="min-width:250px;">${getTxt('td_th_tram') || 'TÊN TRẠM \\ HỌ VÀ TÊN'}</th>`;
+
+        // People Headers
+        d.people.forEach((p, i) => {
+            let pName = p;
+            let pCode = '';
+            let parts = p.trim().split(/\s+/);
+            let lastWord = parts[parts.length - 1];
+
+            if (parts.length > 1 && (/[0-9]/.test(lastWord) && lastWord.length > 3 || /^VC?\d+$/i.test(lastWord))) {
+                pCode = lastWord;
+                pName = parts.slice(0, -1).join(' ').trim();
+            } else if (p.includes('-')) {
+                let pParts = p.split('-');
+                pName = pParts[0].trim();
+                pCode = pParts.slice(1).join('-').trim();
+            }
+
+            let pCodeHtml = pCode ? `<br><span style="font-size:12px; font-weight:bold; color:#dc2626;">${pCode}</span>` : '';
+            html += `<th>${pName}${pCodeHtml}</th>`;
+        });
+        html += `
+            <th data-lang="td_th_dahoc" style="width:70px; color:#059669; min-width:70px;">${getTxt('td_th_dahoc') || 'Đã Học'}</th>
+            <th data-lang="td_th_chua" style="width:70px; color:#dc2626; min-width:70px;">${getTxt('td_th_chua') || 'Chưa Học'}</th>
+            <th data-lang="td_th_tyle" style="width:70px; color:#4338ca; min-width:70px;">${getTxt('td_th_tyle') || 'Tỷ Lệ'}</th>
+        `;
+        html += '</tr></thead><tbody>';
+
+        // Station Rows
+        d.stations.forEach((s, rIdx) => {
+            html += `<tr>`;
+            html += `<td class="td-col-fixed">${rIdx + 1}. ${s}</td>`;
+
+            let safeS = s.replace(/'/g, "\\'").replace(/"/g, "&quot;");
+
+            let learnedCount = 0;
+            d.people.forEach(p => {
+                let key = s + '|' + p;
+                let checked = d.checks[key] ? 'checked' : '';
+                if (checked) learnedCount++;
+                let safeP = p.replace(/'/g, "\\'").replace(/"/g, "&quot;");
+                html += `<td class="td-cell-click" onclick="tdToggleClick(this, '${safeS}', '${safeP}')">
+                    <input type="checkbox" class="td-check-lg" ${checked}>
+                </td>`;
+            });
+
+            let totalP = d.people.length || 1;
+            let unlearned = d.people.length - learnedCount;
+            let pct = Math.round((learnedCount / totalP) * 100) || 0;
+
+            html += `
+                <td style="text-align:center; font-weight:900; font-size:16px; color:#059669; background:#d1fae5; padding:5px;">${learnedCount}</td>
+                <td style="text-align:center; font-weight:900; font-size:16px; color:#dc2626; background:#fee2e2; padding:5px;">${unlearned}</td>
+                <td style="text-align:center; font-weight:900; font-size:16px; color:#4338ca; background:#e0e7ff; padding:5px;">${pct}%</td>
+            `;
+            html += `</tr>`;
+        });
+
+        // Bottom Stats Row (For People)
+        html += `<tr style="background:#f8fafc;">`;
+        html += `<td class="td-col-fixed" data-lang="td_th_tongket" style="font-weight:900; font-size:16px; text-align:center; text-transform:uppercase;">${getTxt('td_th_tongket') || 'TỔNG KẾT NHÂN VIÊN'}</td>`;
+
+        d.people.forEach(p => {
+            let pLearned = 0;
+            d.stations.forEach(s => {
+                if (d.checks[s + '|' + p]) pLearned++;
+            });
+            let totalS = d.stations.length || 1;
+            let unlearnedS = d.stations.length - pLearned;
+            let pct = Math.round((pLearned / totalS) * 100) || 0;
+
+            html += `<td style="padding:8px 5px; text-align:center; vertical-align:top;">
+                <div class="td-stat-box-modern" style="color:#059669;"><span data-lang="td_th_dahoc">${getTxt('td_th_dahoc') || 'Đã học'}</span>: <b style="font-size:14px;">${pLearned}</b></div>
+                <div class="td-stat-box-modern" style="color:#dc2626;"><span data-lang="td_th_chua">${getTxt('td_th_chua') || 'Chưa'}</span>: <b style="font-size:14px;">${unlearnedS}</b></div>
+                <div class="td-stat-box-modern" style="background:#e0e7ff; color:#4338ca; font-size:15px; font-weight:900;">${pct}%</div>
+            </td>`;
+        });
+
+        html += `<td colspan="3" style="background:#f1f5f9;"></td></tr>`; // empty corner
+        html += '</tbody></table>';
+        container.innerHTML = html;
+    }
+
+    function tdToggleClick(td, station, person) {
+        if (!tdHasPerm('tien-do-ctq') && !tdHasPerm('admin')) {
+            showToast('Bạn không có quyền sửa!', 'error');
+            return;
+        }
+        let cb = td.querySelector('input');
+        if (!cb) return;
+        let newVal = !cb.checked;
+        cb.checked = newVal;
+
+        let key = station + '|' + person;
+        if (newVal) {
+            window.TienDoData.checks[key] = true;
+        } else {
+            delete window.TienDoData.checks[key];
+        }
+
+        // Sync to server silently
+        google.script.run.withFailureHandler(err => {
+            console.error("Lưu Tiến độ thất bại:", err);
+            showToast("Lỗi đồng bộ: " + err, 'error');
+        }).saveTienDoCTQData(JSON.stringify(window.TienDoData));
+
+        // Render current view to update stats locally
+        renderTienDoMatrix();
+    }
+
+    function tdClearAllTicks() {
+        if (!tdHasPerm('tien-do-ctq') && !tdHasPerm('admin')) {
+            showToast('Bạn không có quyền sửa!', 'error');
+            return;
+        }
+        if (confirm('Bạn có chắc chắn muốn xóa TOÀN BỘ tích (✅) không? Hành động này không thể hoàn tác!')) {
+            window.TienDoData.checks = {};
+            showToast('Đang xóa dữ liệu...', 'warning');
+
+            google.script.run.withSuccessHandler(function () {
+                showToast('Đã xóa thành công toàn bộ tích!', 'success');
+            }).withFailureHandler(err => {
+                console.error("Lưu Tiến độ thất bại:", err);
+                showToast("Lỗi đồng bộ: " + err, 'error');
+            }).saveTienDoCTQData(JSON.stringify(window.TienDoData));
+
+            renderTienDoMatrix();
+        }
+    }
+
+    function tdCaptureTable() {
+        if (!window.html2canvas) {
+            showToast('Đang tải công cụ chụp ảnh...', 'warning');
+
+            const urls = [
+                'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js',
+                'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js',
+                'https://unpkg.com/html2canvas@1.4.1/dist/html2canvas.min.js',
+                'html2canvas.min.js'
+            ];
+
+            let tryLoad = (index) => {
+                if (index >= urls.length) {
+                    showToast('Không tải được công cụ chụp ảnh do mạng chặn. Vui lòng copy file html2canvas.min.js vào cùng thư mục!', 'error');
+                    let btn = document.querySelector('button[onclick="tdCaptureTable()"]');
+                    if (btn) btn.innerHTML = '📸 Chụp Ảnh';
+                    return;
+                }
+                let script = document.createElement('script');
+                script.src = urls[index];
+                script.onload = () => {
+                    showToast('Công cụ đã sẵn sàng, đang chụp...', 'success');
+                    tdExecuteCapture();
+                };
+                script.onerror = () => {
+                    console.warn('Load failed:', urls[index]);
+                    tryLoad(index + 1);
+                };
+                document.head.appendChild(script);
+            };
+
+            tryLoad(0);
+        } else {
+            tdExecuteCapture();
+        }
+    }
+
+    function tdExecuteCapture() {
+        let el = document.getElementById('td-matrix-render');
+        if (!el || el.innerHTML.trim() === '') {
+            showToast('Chưa có dữ liệu để chụp!', 'error');
+            return;
+        }
+
+        let target = el.querySelector('.td-table') || el;
+        let btn = document.querySelector('button[onclick="tdCaptureTable()"]');
+        let oldText = btn ? btn.innerHTML : '';
+        if (btn) btn.innerHTML = '⏳ Đang chụp...';
+
+        html2canvas(target, {
+            scale: 2,
+            useCORS: true,
+            backgroundColor: '#ffffff'
+        }).then(canvas => {
+            let link = document.createElement('a');
+            link.download = 'TienDoCTQ_' + new Date().getTime() + '.png';
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+            if (btn) btn.innerHTML = oldText;
+            showToast('Đã lưu ảnh thành công!', 'success');
+        }).catch(err => {
+            if (btn) btn.innerHTML = oldText;
+            showToast('Lỗi khi chụp ảnh: ' + err, 'error');
+        });
+    }
+
+    function tdToggleCheck(station, person, val) {
+        if (!tdHasPerm('tien-do-ctq') && !tdHasPerm('admin')) {
+            showToast('Bạn không có quyền sửa!', 'error');
+            loadTienDoCTQ(); // revert
+            return;
+        }
+
+        let key = station + '|' + person;
+        if (val) {
+            window.TienDoData.checks[key] = true;
+        } else {
+            delete window.TienDoData.checks[key];
+        }
+
+        // Render current view to update stats locally
+        renderTienDoMatrix();
+
+        // Sync to server silently
+        google.script.run.withFailureHandler(err => {
+            console.error("Lưu Tiến độ thất bại:", err);
+            showToast("Lỗi đồng bộ: " + err, 'error');
+        }).saveTienDoCTQData(JSON.stringify(window.TienDoData));
+    }
+
+    let tdCurrentAddMode = '';
+
+    function tdShowAddModal(mode) {
+        tdCurrentAddMode = mode;
+        let title = mode === 'station' ? '➕ Thêm Trạm Mới' : '➕ Thêm Người Mới';
+
+        let html = '';
+        if (mode === 'person') {
+            html = `
+                <div style="font-size:13px; color:#64748b; margin-bottom:5px; font-weight:bold;">Cách 1: Thêm từng người</div>
+                <div style="display:flex; gap:10px; margin-bottom:15px;">
+                    <input type="text" id="td-add-p-name" placeholder="Họ và Tên" style="flex:2; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-family:inherit; font-size:14px; box-sizing:border-box;">
+                    <input type="text" id="td-add-p-code" placeholder="Mã thẻ (để trống cũng được)" style="flex:1; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-family:inherit; font-size:14px; box-sizing:border-box;">
+                </div>
+                <div style="font-size:13px; color:#64748b; margin-bottom:5px; font-weight:bold;">Cách 2: Thêm nhiều người (dán từ Excel)</div>
+                <textarea id="td-modal-input" style="width:100%; height:80px; padding:10px; border:1px solid #cbd5e1; border-radius:8px; resize:vertical; font-family:inherit; margin-bottom:15px; box-sizing:border-box;" placeholder="Nguyễn Văn A - V0123456\nTrần Thị B - V0123457\n..."></textarea>
+            `;
+        } else {
+            html = `
+                <div style="font-size:13px; color:#64748b; margin-bottom:10px;">Bạn có thể dán (Ctrl+V) nhiều dòng vào ô dưới đây. Mỗi dòng sẽ là 1 mục mới.</div>
+                <textarea id="td-modal-input" style="width:100%; height:120px; padding:10px; border:1px solid #cbd5e1; border-radius:8px; resize:vertical; font-family:inherit; margin-bottom:15px; box-sizing:border-box;" placeholder="Tên Trạm 1\nTên Trạm 2\n..."></textarea>
+            `;
+        }
+
+        document.getElementById('td-modal-title').innerText = title;
+        document.getElementById('td-modal-body').innerHTML = html;
+        document.getElementById('td-modal-add').style.display = 'flex';
+
+        let btn = document.getElementById('td-modal-save');
+        btn.innerText = 'Xác Nhận Thêm';
+        btn.className = 'td-btn-modern td-btn-add-m';
+
+        btn.onclick = function () {
+            let text = '';
+
+            if (mode === 'person') {
+                let name = document.getElementById('td-add-p-name').value.trim();
+                let code = document.getElementById('td-add-p-code').value.trim();
+                if (name) {
+                    text += name + (code ? ' - ' + code : '') + '\n';
+                }
+            }
+
+            let area = document.getElementById('td-modal-input');
+            if (area) text += area.value;
+
+            if (!text.trim()) {
+                showToast('Vui lòng nhập dữ liệu!', 'warning');
+                return;
+            }
+            tdProcessAddMultiple(text, tdCurrentAddMode);
+            document.getElementById('td-modal-add').style.display = 'none';
+        };
+    }
+
+    function tdProcessAddMultiple(text, mode) {
+        if (!text || !text.trim()) return;
+        let lines = text.split('\n').map(s => s.trim()).filter(s => s);
+        if (lines.length === 0) return;
+
+        let arr = mode === 'station' ? window.TienDoData.stations : window.TienDoData.people;
+        let addedCount = 0;
+
+        lines.forEach(name => {
+            if (!arr.includes(name)) {
+                arr.push(name);
+                addedCount++;
+            }
+        });
+
+        if (addedCount > 0) {
+            tdForceSync();
+            showToast(`Đã thêm thành công ${addedCount} mục!`, 'success');
+        } else {
+            showToast('Các mục này đã tồn tại!', 'warning');
+        }
+    }
+
+    function tdAddStation() {
+        tdShowAddModal('station');
+    }
+
+    function tdAddPerson() {
+        tdShowAddModal('person');
+    }
+
+    function tdShowDeleteModal(mode) {
+        let title = mode === 'station' ? '🗑️ ' + (getTxt('td_btn_del_station') || 'Xóa Trạm') : '🗑️ ' + (getTxt('td_btn_del_person') || 'Xóa Người');
+        let list = mode === 'station' ? window.TienDoData.stations : window.TienDoData.people;
+
+        let html = '<div style="font-size:13px; color:#64748b; margin-bottom:10px;">Chọn các mục bạn muốn xóa:</div>';
+        html += '<div style="max-height:300px; overflow-y:auto; border:1px solid #e2e8f0; border-radius:6px; padding:10px;">';
+
+        if (list.length === 0) {
+            html += '<div style="color:#94a3b8; font-style:italic;">Không có dữ liệu.</div>';
+        } else {
+            html += `<div style="padding:10px 0; border-bottom:2px solid #cbd5e1; display:flex; align-items:center; cursor:pointer;" onclick="let cb=this.querySelector('input'); cb.checked=!cb.checked; let allCb=document.querySelectorAll('.td-del-cb'); allCb.forEach(c => c.checked=cb.checked);">
+                <input type="checkbox" id="td-del-select-all" style="margin-right:10px; width:18px; height:18px; pointer-events:none;">
+                <span data-lang="td_del_all" style="font-size:14px; font-weight:bold; color:#ef4444;">${getTxt('td_del_all') || 'Chọn tất cả'}</span>
+            </div>`;
+
+            list.forEach((item, index) => {
+                html += `<div style="padding:8px 0; border-bottom:1px solid #f1f5f9; display:flex; align-items:center; cursor:pointer;" onclick="let cb=this.querySelector('input'); cb.checked=!cb.checked;">
+                    <input type="checkbox" class="td-del-cb" value="${index}" style="margin-right:10px; width:18px; height:18px; pointer-events:none;">
+                    <span style="font-size:14px; font-weight:500;">${item}</span>
+                </div>`;
+            });
+        }
+        html += '</div>';
+
+        document.getElementById('td-modal-title').innerText = title;
+        document.getElementById('td-modal-body').innerHTML = html;
+        document.getElementById('td-modal-add').style.display = 'flex';
+
+        let btn = document.getElementById('td-modal-save');
+        btn.innerText = 'Xác Nhận Xóa';
+        btn.className = 'td-btn-modern td-btn-del-m';
+
+        btn.onclick = function () {
+            let cbs = document.querySelectorAll('.td-del-cb:checked');
+            if (cbs.length === 0) {
+                showToast('Chưa chọn mục nào!', 'warning');
+                return;
+            }
+            if (!confirm(`Bạn có chắc muốn xóa ${cbs.length} mục đã chọn?`)) return;
+
+            let toDeleteIndexes = Array.from(cbs).map(cb => parseInt(cb.value, 10));
+            let toDeleteItems = toDeleteIndexes.map(idx => list[idx]);
+
+            if (mode === 'station') {
+                window.TienDoData.stations = window.TienDoData.stations.filter((s, i) => !toDeleteIndexes.includes(i));
+            } else {
+                window.TienDoData.people = window.TienDoData.people.filter((p, i) => !toDeleteIndexes.includes(i));
+            }
+
+            for (let k in window.TienDoData.checks) {
+                let parts = k.split('|');
+                if (mode === 'station' && toDeleteItems.includes(parts[0])) delete window.TienDoData.checks[k];
+                if (mode === 'person' && toDeleteItems.includes(parts[1])) delete window.TienDoData.checks[k];
+            }
+
+            tdForceSync();
+            document.getElementById('td-modal-add').style.display = 'none';
+        };
+    }
+
+    function tdForceSync() {
+        showToast("Đang lưu...", "warning");
+        renderTienDoMatrix();
+        google.script.run.withSuccessHandler(() => {
+            showToast("Đã lưu thành công!", "success");
+        }).withFailureHandler(err => {
+            showToast("Lưu thất bại: " + err, "error");
+        }).saveTienDoCTQData(JSON.stringify(window.TienDoData));
+    }
+
+    function tdShowDetails(type, name, mode) {
+        let d = window.TienDoData;
+        let title = '';
+        let list = [];
+
+        if (type === 'person') {
+            if (mode === 'learned') {
+                title = `${getTxt('td_det_learned') || 'Chi tiết các trạm ĐÃ HỌC của:'} <br><span style="color:#0ea5e9">${name}</span>`;
+                d.stations.forEach(s => {
+                    if (d.checks[s + '|' + name]) list.push(s);
+                });
+            } else {
+                title = `${getTxt('td_det_unlearned') || 'Chi tiết các trạm CHƯA HỌC của:'} <br><span style="color:#ef4444">${name}</span>`;
+                d.stations.forEach(s => {
+                    if (!d.checks[s + '|' + name]) list.push(s);
+                });
+            }
+        } else {
+            title = `${getTxt('td_det_station') || 'Danh sách những người ĐÃ HỌC trạm:'} <br><span style="color:#10b981">${name}</span>`;
+            d.people.forEach(p => {
+                if (d.checks[name + '|' + p]) list.push(p);
+            });
+        }
+
+        let html = list.map((x, i) => `<div style="padding:10px 8px; border-bottom:1px solid #e2e8f0; font-size:15px; font-weight:500;">${i + 1}. ${x}</div>`).join('');
+        if (list.length === 0) html = `<div style="padding:15px; color:#64748b; font-style:italic; text-align:center;">${getTxt('td_det_empty') || 'Không có dữ liệu.'}</div>`;
+
+        let modal = document.getElementById('td-modal-details');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'td-modal-details';
+            modal.style.cssText = 'position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:10000; display:flex; justify-content:center; align-items:center;';
+            modal.innerHTML = `
+                <div style="background:#fff; width:500px; max-width:95%; border-radius:12px; padding:20px; box-shadow:0 10px 25px rgba(0,0,0,0.2); max-height:85vh; display:flex; flex-direction:column;">
+                    <div id="td-modal-details-title" style="font-size:16px; font-weight:bold; margin-bottom:15px; color:#0f172a; padding-bottom:10px; border-bottom:2px solid #e2e8f0; line-height:1.4;"></div>
+                    <div id="td-modal-details-content" style="overflow-y:auto; flex-grow:1; margin-bottom:15px; max-height:60vh;"></div>
+                    <div style="text-align:right;">
+                        <button class="td-btn-modern" style="background:#64748b;" onclick="document.getElementById('td-modal-details').style.display='none'">${getTxt('td_det_close') || 'Đóng Lại'}</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+        }
+        document.getElementById('td-modal-details-title').innerHTML = title;
+        document.getElementById('td-modal-details-content').innerHTML = html;
+        modal.style.display = 'flex';
+    }
+
+    function renderTienDoTongQuan() {
+        let d = window.TienDoData;
+
+        let pStats = d.people.map(p => {
+            let learned = 0;
+            d.stations.forEach(s => { if (d.checks[s + '|' + p]) learned++; });
+            return { name: p, learned: learned, unlearned: d.stations.length - learned };
+        });
+
+        let sStats = d.stations.map(s => {
+            let learned = 0;
+            d.people.forEach(p => { if (d.checks[s + '|' + p]) learned++; });
+            return { name: s, learned: learned };
+        });
+
+        let safeName = (n) => n.replace(/'/g, "\\'").replace(/"/g, "&quot;");
+
+        // Sort for Top People Learned Most
+        pStats.sort((a, b) => b.learned - a.learned);
+        let htmlP = '';
+        pStats.forEach((item, i) => {
+            htmlP += `<div class="td-tq-item" style="font-size:15px; font-weight:bold; cursor:pointer; padding:12px 10px; transition:background 0.2s;" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background='transparent'" ondblclick="tdShowDetails('person', '${safeName(item.name)}', 'learned')">
+                <span class="td-tq-item-name">#${i + 1}. ${item.name}</span>
+                <span class="td-tq-item-val" style="font-size:15px; white-space:nowrap; margin-left:10px;">${item.learned} ${getTxt('td_tq_tram') || 'trạm'}</span>
+            </div>`;
+        });
+
+        // Sort for Top People Unlearned (Learned Least)
+        let pStatsUn = [...pStats].sort((a, b) => b.unlearned - a.unlearned);
+        let htmlUn = '';
+        pStatsUn.forEach((item, i) => {
+            if (item.unlearned > 0) {
+                htmlUn += `<div class="td-tq-item" style="font-size:15px; font-weight:bold; cursor:pointer; padding:12px 10px; transition:background 0.2s;" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background='transparent'" ondblclick="tdShowDetails('person', '${safeName(item.name)}', 'unlearned')">
+                    <span class="td-tq-item-name">#${i + 1}. ${item.name}</span>
+                    <span class="td-tq-item-val low" style="font-size:15px; white-space:nowrap; margin-left:10px;">${item.unlearned} ${getTxt('td_tq_tram') || 'trạm'}</span>
+                </div>`;
+            }
+        });
+
+        // Sort for Top Stations Learned Most
+        sStats.sort((a, b) => b.learned - a.learned);
+        let htmlS = '';
+        sStats.forEach((item, i) => {
+            htmlS += `<div class="td-tq-item" style="font-size:15px; font-weight:bold; cursor:pointer; padding:12px 10px; transition:background 0.2s;" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background='transparent'" ondblclick="tdShowDetails('station', '${safeName(item.name)}', 'learned')">
+                <span class="td-tq-item-name">#${i + 1}. ${item.name}</span>
+                <span class="td-tq-item-val" style="font-size:15px; white-space:nowrap; margin-left:10px;">${item.learned} ${getTxt('td_tq_nguoi') || 'người'}</span>
+            </div>`;
+        });
+
+        let html = `
+            <div class="td-tq-card">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; border-bottom:2px solid #e2e8f0; padding-bottom:10px;">
+                    <div class="td-tq-title" data-lang="td_tq_title1" style="margin-bottom:0; border:none; padding:0;">${getTxt('td_tq_title1') || '🏆 Top Người Học Nhiều Nhất'}</div>
+                    <button class="td-btn-modern" data-lang="td_btn_viewall" style="padding:4px 8px; font-size:11px;" onclick="tdShowFullRanking('pMost')">${getTxt('td_btn_viewall') || 'Xem Hết'}</button>
+                </div>
+                <div class="td-tq-list" style="max-height:350px; overflow-y:auto; padding-right:5px;">${htmlP || '<div style="color:#94a3b8; font-style:italic;">Chưa có dữ liệu</div>'}</div>
+            </div>
+            <div class="td-tq-card">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; border-bottom:2px solid #e2e8f0; padding-bottom:10px;">
+                    <div class="td-tq-title" data-lang="td_tq_title2" style="margin-bottom:0; border:none; padding:0;">${getTxt('td_tq_title2') || '🚨 Top Người Tồn Đọng (Chưa Học)'}</div>
+                    <button class="td-btn-modern" data-lang="td_btn_viewall" style="padding:4px 8px; font-size:11px;" onclick="tdShowFullRanking('pLeast')">${getTxt('td_btn_viewall') || 'Xem Hết'}</button>
+                </div>
+                <div class="td-tq-list" style="max-height:350px; overflow-y:auto; padding-right:5px;">${htmlUn || '<div style="color:#94a3b8; font-style:italic;">Chưa có dữ liệu</div>'}</div>
+            </div>
+            <div class="td-tq-card">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; border-bottom:2px solid #e2e8f0; padding-bottom:10px;">
+                    <div class="td-tq-title" data-lang="td_tq_title3" style="margin-bottom:0; border:none; padding:0;">${getTxt('td_tq_title3') || '🔥 Trạm Được Học Nhiều Nhất'}</div>
+                    <button class="td-btn-modern" data-lang="td_btn_viewall" style="padding:4px 8px; font-size:11px;" onclick="tdShowFullRanking('sMost')">${getTxt('td_btn_viewall') || 'Xem Hết'}</button>
+                </div>
+                <div class="td-tq-list" style="max-height:350px; overflow-y:auto; padding-right:5px;">${htmlS || '<div style="color:#94a3b8; font-style:italic;">Chưa có dữ liệu</div>'}</div>
+            </div>
+        `;
+        document.getElementById('td-tq-render').innerHTML = html;
+
+        // Draw Chart
+        drawTienDoChart(pStats, d.stations.length);
+    }
+
+    function tdShowFullRanking(type) {
+        let d = window.TienDoData;
+        let pStats = [];
+        let sStats = [];
+        let safeName = (n) => n.replace(/'/g, "\\'").replace(/"/g, "&quot;");
+
+        d.people.forEach(p => {
+            let learned = 0;
+            d.stations.forEach(s => { if (d.checks[s + '|' + p]) learned++; });
+            let unlearned = d.stations.length - learned;
+            pStats.push({ name: p, learned, unlearned });
+        });
+        d.stations.forEach(s => {
+            let learned = 0;
+            d.people.forEach(p => { if (d.checks[s + '|' + p]) learned++; });
+            sStats.push({ name: s, learned });
+        });
+
+        let title = '';
+        let listHtml = '';
+
+        if (type === 'pMost') {
+            title = getTxt('td_tq_title1') || '🏆 Top Người Học Nhiều Nhất';
+            pStats.sort((a, b) => b.learned - a.learned);
+            pStats.forEach((item, i) => {
+                listHtml += `<div style="padding:10px 8px; border-bottom:1px solid #e2e8f0; font-size:15px; font-weight:500; display:flex; justify-content:space-between;">
+                    <span>#${i + 1}. ${item.name}</span>
+                    <span style="color:#0ea5e9; font-weight:bold; white-space:nowrap; margin-left:15px;">${item.learned} ${getTxt('td_tq_tram') || 'trạm'}</span>
+                </div>`;
+            });
+        } else if (type === 'pLeast') {
+            title = getTxt('td_tq_title2') || '🚨 Top Người Tồn Đọng (Chưa Học)';
+            pStats.sort((a, b) => b.unlearned - a.unlearned);
+            pStats.forEach((item, i) => {
+                if (item.unlearned > 0) {
+                    listHtml += `<div style="padding:10px 8px; border-bottom:1px solid #e2e8f0; font-size:15px; font-weight:500; display:flex; justify-content:space-between;">
+                        <span>#${i + 1}. ${item.name}</span>
+                        <span style="color:#ef4444; font-weight:bold; white-space:nowrap; margin-left:15px;">${item.unlearned} ${getTxt('td_tq_tram') || 'trạm'}</span>
+                    </div>`;
+                }
+            });
+        } else {
+            title = getTxt('td_tq_title3') || '🔥 Trạm Được Học Nhiều Nhất';
+            sStats.sort((a, b) => b.learned - a.learned);
+            sStats.forEach((item, i) => {
+                listHtml += `<div style="padding:10px 8px; border-bottom:1px solid #e2e8f0; font-size:15px; font-weight:500; display:flex; justify-content:space-between;">
+                    <span>#${i + 1}. ${item.name}</span>
+                    <span style="color:#10b981; font-weight:bold; white-space:nowrap; margin-left:15px;">${item.learned} ${getTxt('td_tq_nguoi') || 'người'}</span>
+                </div>`;
+            });
+        }
+
+        if (!listHtml) listHtml = `<div style="padding:15px; color:#64748b; font-style:italic; text-align:center;">${getTxt('td_det_empty') || 'Không có dữ liệu.'}</div>`;
+
+        let modal = document.getElementById('td-modal-details');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'td-modal-details';
+            modal.style.cssText = 'position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:10000; display:flex; justify-content:center; align-items:center;';
+            document.body.appendChild(modal);
+        }
+
+        let htmlContent = `
+            <div style="background:#fff; width:800px; max-width:95%; border-radius:12px; padding:20px; box-shadow:0 10px 25px rgba(0,0,0,0.2); max-height:85vh; display:flex; flex-direction:column;">
+                <div id="td-det-title" style="font-size:18px; font-weight:bold; margin-bottom:15px; color:#1e293b; border-bottom:2px solid #e2e8f0; padding-bottom:10px;">${title} - <span style="color:#64748b; font-size:14px; font-weight:normal;">${getTxt('td_rank_full_title') || 'Bảng Xếp Hạng Đầy Đủ'}</span></div>
+                <div id="td-det-content" style="flex:1; overflow-y:auto; padding-right:5px; margin-bottom:15px;">${listHtml}</div>
+                <div style="display:flex; justify-content:flex-end;">
+                    <button class="td-btn-modern" style="background:#64748b; box-shadow:none;" onclick="document.getElementById('td-modal-details').style.display='none'">${getTxt('td_det_close') || 'Đóng Lại'}</button>
+                </div>
+            </div>
+        `;
+        modal.innerHTML = htmlContent;
+        modal.style.display = 'flex';
+    }
+
+    function drawTienDoChart(pStats, totalStations) {
+        if (typeof google === 'undefined' || !google.visualization) return;
+
+        let tName = getTxt('td_chart_name') || 'Họ Và Tên';
+        let tLearned = getTxt('td_chart_learned') || 'Số Trạm Đã Học';
+        let tPct = getTxt('td_chart_pct') || '% Hoàn Thành';
+
+        let chartData = [[tName, tLearned, { type: 'string', role: 'tooltip', p: { html: true } }, { role: 'annotation' }, tPct, { role: 'annotation' }]];
+
+        pStats.forEach((p, i) => {
+            let pct = totalStations > 0 ? Math.round((p.learned / totalStations) * 100) : 0;
+            let pName = p.name.includes('-') ? p.name.split('-')[0].trim() : p.name;
+
+            let tooltip = `<div style="padding:10px; font-family:sans-serif; width:150px; font-size:13px;">
+                <b style="color:#0f172a; font-size:14px;">${p.name}</b><br/><br/>
+                ${tLearned}: <b style="color:#0ea5e9;">${p.learned}/${totalStations}</b><br/>
+                ${tPct}: <b style="color:#ef4444;">${pct}%</b>
+            </div>`;
+
+            let txtDaHoc = getTxt('td_th_dahoc') || 'Đã Học';
+            let txtTyLe = getTxt('td_th_tyle') || 'Tỷ Lệ';
+
+            let learnedAnn = `${txtDaHoc} ${p.learned}/${totalStations}`;
+            let pctAnn = `${txtTyLe} ${pct}%`;
+
+            chartData.push([pName, p.learned, tooltip, learnedAnn, pct, pctAnn]);
+        });
+
+        let maxScale = totalStations > 0 ? (totalStations + 5) : 5;
+        let maxPctScale = totalStations > 0 ? (100 * maxScale / totalStations) : 100;
+
+        let data = google.visualization.arrayToDataTable(chartData);
+        let options = {
+            legend: { position: 'top', textStyle: { color: '#64748b' } },
+            tooltip: { isHtml: true },
+            seriesType: 'bars',
+            series: {
+                0: {
+                    targetAxisIndex: 0,
+                    color: '#3b82f6',
+                    annotations: { stem: { length: 20, color: 'transparent' }, textStyle: { color: '#2563eb' } }
+                },
+                1: {
+                    type: 'line',
+                    targetAxisIndex: 1,
+                    color: '#ef4444',
+                    lineWidth: 3,
+                    pointSize: 5,
+                    annotations: { stem: { length: 45, color: 'transparent' }, textStyle: { color: '#dc2626' } }
+                }
+            },
+            annotations: {
+                alwaysOutside: true,
+                textStyle: { fontSize: 12, bold: true }
+            },
+            vAxes: {
+                0: { title: tLearned, minValue: 0, maxValue: maxScale, textStyle: { color: '#64748b' } },
+                1: { title: tPct, minValue: 0, maxValue: maxPctScale, textStyle: { color: '#64748b' } }
+            },
+            bar: { groupWidth: '40px' },
+            chartArea: { width: '85%', height: '65%', top: 40, bottom: 50 },
+            hAxis: { textStyle: { color: '#0f172a', fontSize: 13, bold: true } },
+            animation: { startup: true, duration: 1000, easing: 'out' }
+        };
+
+        if (tdChartInstance) tdChartInstance.clearChart();
+        tdChartInstance = new google.visualization.ComboChart(document.getElementById('td-chart-div'));
+        tdChartInstance.draw(data, options);
+    }
+
+    // Gắn vào hệ thống load chung (nếu cần) - gọi thủ công khi click nav
+    window.addEventListener('load', () => {
+        // Init tab content
+        let tab = document.getElementById('tab-tien-do-ctq');
+        if (tab) {
+            // override switchTab if needed or handle click
+            let navItem = document.getElementById('nav-tien-do-ctq');
+            if (navItem) {
+                let originalClick = navItem.onclick;
+                navItem.onclick = function (e) {
+                    // switch tab first
+                    if (originalClick) originalClick.call(this, e);
+                    // then init if not inited
+                    if (tab.innerHTML.trim() === '') {
+                        initTienDoCTQ();
+                    } else {
+                        // refresh data just in case
+                        loadTienDoCTQ();
+                    }
+                };
+            }
+        }
+
+        // Hook language change to re-render chart dynamically
+        if (typeof window.updateTextByLang === 'function') {
+            let oldUpdate = window.updateTextByLang;
+            window.updateTextByLang = function () {
+                oldUpdate();
+                let tongquan = document.getElementById('td-view-tongquan');
+                if (tongquan && tongquan.style.display !== 'none' && window.TienDoData) {
+                    renderTienDoTongQuan();
+                }
+
+                let chitiet = document.getElementById('td-view-chitiet');
+                if (chitiet && chitiet.style.display !== 'none' && window.TienDoData) {
+                    renderTienDoMatrix();
+                }
+
+                // Update active modal title if open
+                let modal = document.getElementById('td-modal-details');
+                if (modal && modal.style.display !== 'none') {
+                    let titleEl = document.getElementById('td-det-title');
+                    if (titleEl) {
+                        let baseTitle = titleEl.innerHTML.split(' - ')[0]; // preserve the type title
+                        titleEl.innerHTML = baseTitle + ' - <span style="color:#64748b; font-size:14px; font-weight:normal;">' + (getTxt('td_rank_full_title') || 'Bảng Xếp Hạng Đầy Đủ') + '</span>';
+                    }
+                }
+            };
+        }
+    });
+
+
+
+
+
+</script>
