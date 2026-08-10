@@ -1,0 +1,934 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <base target="_top">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>CTQ Management System V1.2.0 MOBILE MAX</title>
+    <script>
+        window.onerror = function (msg, url, lineNo, columnNo, error) {
+            alert('Global Error: ' + msg + '\nLine: ' + lineNo);
+            return false;
+        };
+    </script>
+    <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+    <?!= include('CTQ2026_styles') ?>
+</head>
+
+<body>
+    <div class="app-toast" id="sys-toast"><span id="sys-toast-msg">Thành công!</span></div>
+
+    <div class="modal-overlay" id="change-pass-modal">
+        <div class="modal-content modal-sm">
+            <div class="modal-close" onclick="document.getElementById('change-pass-modal').style.display='none'">&times;
+            </div>
+            <h3 style="color:var(--primary); font-weight:900; margin-bottom:20px; font-size:20px; text-transform:uppercase;"
+                data-lang="cp_title">
+                ĐỔI MẬT KHẨU</h3>
+            <div class="form-group"><label data-lang="cp_old">Mật khẩu cũ:</label><input type="password" id="cp-old"
+                    class="app-input" placeholder="Nhập mật khẩu hiện tại" data-lang="cp_old_ph"></div>
+            <div class="form-group"><label data-lang="cp_new">Mật khẩu mới:</label><input type="password" id="cp-new"
+                    class="app-input" placeholder="Nhập mật khẩu mới" data-lang="cp_new_ph"></div>
+            <div class="form-group"><label data-lang="cp_confirm">Xác nhận mật khẩu mới:</label><input type="password"
+                    id="cp-confirm" class="app-input" placeholder="Nhập lại mật khẩu mới" data-lang="cp_confirm_ph">
+            </div>
+            <button class="btn" style="background:var(--warning); margin-top:15px; color:#000;"
+                onclick="submitChangePassword()" data-lang="cp_btn">CẬP NHẬT MẬT KHẨU</button>
+        </div>
+    </div>
+
+    <!-- 3D POPUP THÔNG BÁO CẤP QUYỀN MỚI -->
+    <div class="modal-overlay" id="new-perm-modal"
+        style="display:none; z-index:99999; background:rgba(0,0,0,0.65); backdrop-filter:blur(6px);">
+        <div
+            style="background:linear-gradient(145deg, #ffffff 0%, #f0fdf4 100%); width:92%; max-width:580px; border-radius:24px; padding:35px 30px; box-shadow:0 25px 60px rgba(0,0,0,0.4), 0 0 0 2px #22c55e; text-align:center; box-sizing:border-box; animation:modalSlideIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);">
+            <div
+                style="font-size:55px; line-height:1; margin-bottom:12px; filter:drop-shadow(0 6px 10px rgba(0,0,0,0.15));">
+                🎉 🛡️</div>
+            <h2
+                style="margin:0; font-size:24px; font-weight:900; color:#15803d; text-transform:uppercase; letter-spacing:0.5px;">
+                THÔNG BÁO CẤP QUYỀN MỚI</h2>
+            <div style="font-size:18px; font-weight:800; color:#166534; margin-top:4px; margin-bottom:20px;">新 权 限 分 配 通
+                知</div>
+
+            <div
+                style="background:#ffffff; border:2px solid #bbf7d0; border-radius:16px; padding:20px; box-shadow:inset 0 2px 6px rgba(0,0,0,0.03); margin-bottom:25px; text-align:left;">
+                <div style="font-size:16px; font-weight:700; color:#1e293b; line-height:1.6;">
+                    📢 Bạn vừa được Admin cấp thêm <b style="color:#2563eb;" id="np-count-vi">1</b> quyền mới sau đây:
+                </div>
+                <div id="np-list-vi"
+                    style="margin-top:10px; margin-bottom:15px; font-size:16px; font-weight:900; color:#1d4ed8; background:#eff6ff; padding:12px 16px; border-radius:10px; border-left:5px solid #2563eb; line-height:1.8;">
+                </div>
+                <div
+                    style="font-size:15px; font-weight:700; color:#334155; line-height:1.6; border-top:1px dashed #cbd5e1; padding-top:12px;">
+                    📢 管理员刚刚为您分配了以下 <b style="color:#2563eb;" id="np-count-zh">1</b> 项新权限：
+                </div>
+                <div id="np-list-zh"
+                    style="margin-top:8px; font-size:15px; font-weight:900; color:#0369a1; background:#f0f9ff; padding:12px 16px; border-radius:10px; border-left:5px solid #0284c7; line-height:1.8;">
+                </div>
+            </div>
+
+            <button onclick="acknowledgeNewPerms()"
+                style="width:100%; padding:16px; background:linear-gradient(180deg, #22c55e 0%, #15803d 100%); color:white; border:none; border-radius:14px; font-size:18px; font-weight:900; cursor:pointer; box-shadow:0 8px 20px rgba(34,197,94,0.4); transition:all 0.2s;">
+                👍 ĐÃ HIỂU / 我 明白 了
+            </button>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="del-inthe-modal">
+        <div class="modal-content modal-sm">
+            <div class="modal-close" onclick="document.getElementById('del-inthe-modal').style.display='none'">&times;
+            </div>
+            <h3 style="color:var(--danger); font-weight:900; margin-bottom:20px; font-size:20px; text-transform:uppercase;"
+                data-lang="del_title">XÓA DỮ LIỆU</h3>
+            <p style="font-weight:800; margin-bottom:15px; color:#444;" data-lang="del_ask">Bạn muốn xóa dữ liệu nào
+                trong bảng này?</p>
+            <label
+                style="display:flex; align-items:center; gap:10px; font-size:15px; font-weight:900; cursor:pointer; margin-bottom:15px;">
+                <input type="radio" name="del_opt" value="all" checked style="width:20px; height:20px;"> <span
+                    data-lang="del_all_tbl">XÓA TRẮNG BẢNG</span>
+            </label>
+            <label style="display:flex; align-items:center; gap:10px; font-size:15px; font-weight:900; cursor:pointer;">
+                <input type="radio" name="del_opt" value="row" style="width:20px; height:20px;"> <span
+                    data-lang="del_row_opt">XÓA THEO DÒNG CỤ THỂ</span>
+            </label>
+            <input type="number" id="del-row-num" class="app-input" placeholder="Nhập số dòng (VD: 2)"
+                data-lang-placeholder="del_row_ph" style="margin-top:10px;">
+            <button class="btn" style="background:var(--danger); margin-top:20px;" onclick="confirmClearCurrentTable()"
+                data-lang="btn_confirm_del">XÁC NHẬN XÓA</button>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="quick-fill-modal">
+        <div class="modal-content modal-md">
+            <div class="modal-close" onclick="document.getElementById('quick-fill-modal').style.display='none'">&times;
+            </div>
+            <h3 style="color:var(--primary); font-weight:900; margin-bottom:20px; font-size:22px; text-align:center; text-transform:uppercase;"
+                data-lang="qf_title">CÔNG CỤ ĐIỀN NHANH</h3>
+            <input type="hidden" id="qf-target-table">
+            <div class="qf-grid">
+                <div class="form-group"><label data-lang="qf_from">TỪ HÀNG (STT):</label><input type="number"
+                        id="qf-from" class="app-input"></div>
+                <div class="form-group"><label data-lang="qf_to">ĐẾN HÀNG (STT):</label><input type="number" id="qf-to"
+                        class="app-input"></div>
+            </div>
+            <div id="qf-fields-container" style="max-height: 45vh; overflow-y:auto; padding-right:10px;"></div>
+            <div style="display:flex; justify-content:space-between; margin-top:25px; gap:20px;">
+                <button class="btn" style="background:#e9ecef; color:#000; flex: 1;"
+                    onclick="document.getElementById('quick-fill-modal').style.display='none'"
+                    data-lang="btn_cancel">HỦY</button>
+                <button class="btn" style="background:var(--accent); color:#000; flex: 1;" onclick="applyQuickFill()"
+                    data-lang="btn_fill_now">⚡ ĐIỀN NGAY</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="select-gv-modal">
+        <div class="modal-content modal-sm">
+            <div class="modal-close" onclick="document.getElementById('select-gv-modal').style.display='none'">&times;
+            </div>
+            <h3 style="color:var(--primary); font-weight:900; margin-bottom:20px; font-size:20px; text-transform:uppercase;"
+                data-lang="title_sel_gv">CHỌN GIÁO VIÊN</h3>
+            <select class="app-input" id="gv-selector"></select>
+            <button class="btn" style="margin-top:20px;" onclick="xacNhanChuyenCapThe()" data-lang="btn_create_card">TẠO
+                IN THẺ</button>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="add-err-modal">
+        <div class="modal-content modal-sm">
+            <div class="modal-close" onclick="document.getElementById('add-err-modal').style.display='none'">&times;
+            </div>
+            <h3 style="color:var(--success); font-weight:900; margin-bottom:20px; font-size:22px; text-transform:uppercase;"
+                data-lang="dm_add_err">+ Thêm Lỗi Mới</h3>
+            <div class="form-group"><label data-lang="lbl_err_code">Mã Lỗi (Tự động nhảy):</label><input type="text"
+                    id="new-err-code" class="app-input disabled-bg" readonly></div>
+            <div class="form-group"><label data-lang="lbl_err_name">Tên Lỗi:</label><textarea id="new-err-name"
+                    class="app-input" rows="3" style="height: auto; padding: 15px;"></textarea></div>
+            <button class="btn" style="background:var(--success); margin-top:10px;" onclick="submitLoiMoi()"
+                data-lang="btn_save_err">LƯU LỖI MỚI</button>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="forgot-pass-modal" style="z-index: 10001;">
+        <div class="modal-content modal-sm">
+            <div class="modal-close" onclick="document.getElementById('forgot-pass-modal').style.display='none'">&times;
+            </div>
+            <h3 style="color:var(--primary); font-weight:900; margin-bottom:20px; font-size:20px; text-transform:uppercase;"
+                data-lang="fp_title">
+                QUÊN MẬT KHẨU</h3>
+            <div class="form-group"><label data-lang="fp_user">Tên tài khoản (Mã Thẻ):</label><input type="text"
+                    id="fp-user" class="app-input" placeholder="Nhập tên tài khoản" data-lang="fp_user_ph"></div>
+            <div class="form-group"><label data-lang="fp_dept">Tên bộ phận:</label><input type="text" id="fp-dept"
+                    class="app-input" placeholder="Nhập tên bộ phận (Giống Cột E)" data-lang="fp_dept_ph"></div>
+            <button class="btn" style="background:var(--danger); margin-top:15px; color:#fff;"
+                onclick="recoverPassword()" data-lang="fp_btn">LẤY LẠI MẬT KHẨU</button>
+            <div id="fp-msg"
+                style="color:var(--success); font-weight:bold; margin-top:15px; text-align:center; font-size: 16px;">
+            </div>
+        </div>
+    </div>
+
+    <div id="login-screen">
+        <div class="login-glass-wrapper">
+            <!-- BẢNG TIN ĐĂNG NHẬP -->
+            <div class="login-news-panel" id="login-news-panel"
+                style="display:none; flex:1.5; min-width:450px; background:transparent; border-radius:20px; overflow:hidden; box-shadow:none; flex-direction:column;">
+
+                <!-- CAROUSEL -->
+                <div id="login-news-carousel"
+                    style="width:100%; height:450px; position:relative; display:none; background:#001e10; overflow:hidden; border-radius: 20px 20px 0 0;">
+                    <div id="carousel-track" style="display:flex; transition:transform 0.5s ease-in-out; height:100%;">
+                        <!-- Hình ảnh javascript chèn vào -->
+                    </div>
+
+                    <!-- Lớp phủ Gradient và Text -->
+                    <div
+                        style="position:absolute; top:0; left:0; width:55%; height:100%; background: linear-gradient(to right, rgba(0,35,20,0.95) 0%, rgba(0,35,20,0.6) 60%, transparent 100%); z-index:5; pointer-events:none; display:flex; flex-direction:column; justify-content:center; padding-left:50px; color:white;">
+                        <div id="hero-text-1"
+                            style="font-size:22px; font-weight:600; margin-bottom:5px; opacity:0.9; letter-spacing:0.5px;">
+                            Welcome to</div>
+                        <div id="hero-text-2"
+                            style="font-size:48px; font-weight:900; margin-bottom:15px; text-shadow: 0 4px 15px rgba(0,0,0,0.4); letter-spacing:1px;">
+                            CTQ System</div>
+                        <div id="hero-text-3"
+                            style="font-size:16px; font-weight:500; opacity:0.85; max-width:280px; line-height:1.6;">
+                            Efficiency, Quality &<br>Performance Management</div>
+                    </div>
+
+                    <!-- Nút sang trái / phải -->
+                    <button onclick="moveCarousel(-1)"
+                        style="position:absolute; left:15px; top:50%; transform:translateY(-50%); background:rgba(0,0,0,0.3); color:#fff; border:none; border-radius:50%; width:36px; height:36px; cursor:pointer; font-size:18px; display:flex; align-items:center; justify-content:center; z-index:10; transition:all 0.3s;"
+                        onmouseover="this.style.background='rgba(0,0,0,0.6)'"
+                        onmouseout="this.style.background='rgba(0,0,0,0.3)'">&#10094;</button>
+                    <button onclick="moveCarousel(1)"
+                        style="position:absolute; right:15px; top:50%; transform:translateY(-50%); background:rgba(0,0,0,0.3); color:#fff; border:none; border-radius:50%; width:36px; height:36px; cursor:pointer; font-size:18px; display:flex; align-items:center; justify-content:center; z-index:10; transition:all 0.3s;"
+                        onmouseover="this.style.background='rgba(0,0,0,0.6)'"
+                        onmouseout="this.style.background='rgba(0,0,0,0.3)'">&#10095;</button>
+
+                    <!-- Chấm tròn indicators -->
+                    <div id="carousel-dots"
+                        style="position:absolute; bottom:25px; left:50px; display:flex; gap:8px; z-index:10;">
+                        <!-- Dots chèn bằng JS -->
+                    </div>
+                </div>
+
+                <div style="padding:25px; background:#ffffff; border-radius: 0 0 20px 20px;">
+                    <div
+                        style="font-size:18px; font-weight:900; color:var(--primary); margin-bottom:15px; display:flex; align-items:center; gap:8px; border-bottom:2px dashed #ccc; padding-bottom:10px;">
+                        <svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2"
+                            fill="none">
+                            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                            <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                        </svg>
+                        <span data-lang="ann_header" style="flex:1;">THÔNG BÁO MỚI NHẤT</span>
+                        <button class="lang-btn" onclick="toggleLang()"
+                            style="margin-left:auto; font-size:12px; padding:4px 10px; cursor:pointer; background:var(--primary); color:#fff; border:none; border-radius:4px; font-weight:bold; box-shadow:0 2px 4px rgba(0,0,0,0.2);">🌐
+                            VN</button>
+                    </div>
+                    <div id="login-news-list" style="display:flex; flex-direction:column; gap:12px; padding-right:5px;">
+                        <!-- Nội dung js -->
+                    </div>
+                </div>
+            </div>
+
+            <div class="login-box-3d">
+                <div class="login-left">
+                    <div class="login-logo">CTQ</div>
+                    <h2
+                        style="font-size:32px; font-weight:900; letter-spacing:2px; margin-bottom:10px; text-shadow: 0 4px 10px rgba(0,0,0,0.3);">
+                        CTQ SYSTEM</h2>
+                    <p
+                        style="font-size:15px; font-weight:700; letter-spacing:3px; opacity:0.9; text-transform:uppercase;">
+                        Efficiency & Perfection</p>
+                </div>
+                <div class="login-right">
+                    <h2 data-lang="login_title" style="color:#003823; font-weight:900; margin-bottom:5px;">ĐĂNG NHẬP
+                    </h2>
+                    <p data-lang="login_desc" style="color:#666; font-size:13px; margin-bottom:25px;">Chào mừng bạn quay
+                        trở lại. Vui lòng đăng nhập để tiếp tục.</p>
+
+                    <div style="position:relative; margin-bottom:15px;">
+                        <svg viewBox="0 0 24 24" width="18" height="18" stroke="#999" stroke-width="2" fill="none"
+                            stroke-linecap="round" stroke-linejoin="round"
+                            style="position:absolute; left:15px; top:50%; transform:translateY(-50%);">
+                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                            <circle cx="12" cy="7" r="4"></circle>
+                        </svg>
+                        <input type="text" id="username" class="app-input" placeholder="Tên đăng nhập (Mã thẻ)"
+                            data-lang="ph_user" style="padding-left:45px; border-radius:10px;">
+                    </div>
+
+                    <div style="position:relative; margin-bottom:25px;">
+                        <svg viewBox="0 0 24 24" width="18" height="18" stroke="#999" stroke-width="2" fill="none"
+                            stroke-linecap="round" stroke-linejoin="round"
+                            style="position:absolute; left:15px; top:50%; transform:translateY(-50%);">
+                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                        </svg>
+                        <input type="password" id="password" class="app-input" placeholder="Mật khẩu"
+                            data-lang="ph_pass"
+                            style="margin-bottom:0; padding-left:45px; padding-right:45px; border-radius:10px;">
+                        <span id="toggle-pwd" onclick="togglePasswordVisibility()"
+                            style="position:absolute; right:15px; top:50%; transform:translateY(-50%); cursor:pointer; color:#999; display:flex;">
+                            <svg id="eye-icon-login" viewBox="0 0 24 24" width="20" height="20" stroke="currentColor"
+                                stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                <circle cx="12" cy="12" r="3"></circle>
+                            </svg>
+                        </span>
+                    </div>
+
+                    <button class="btn"
+                        style="background: #003823; height: 50px; font-size:16px; border-radius:10px; display:flex; align-items:center; justify-content:center; gap:8px;"
+                        onclick="login()" data-lang="login_btn">
+                        <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2"
+                            fill="none" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                        </svg>
+                        VÀO HỆ THỐNG
+                    </button>
+
+                    <div style="text-align: center; margin-top: 20px;">
+                        <span
+                            style="color: #003823; cursor: pointer; font-weight: 700; font-size: 14px; text-decoration: underline;"
+                            onclick="document.getElementById('forgot-pass-modal').style.display='flex'">Quên Mật
+                            Khẩu</span>
+                    </div>
+                    <div id="login-msg"
+                        style="color:#ff6b6b; margin-top:15px; font-size:14px; font-weight:900; text-align:center;">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="main-app">
+        <div class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <div class="user-avatar" id="avatar-icon">A</div>
+                <div class="user-text">
+                    <div class="sys-name">CTQ SYSTEM</div>
+                    <div class="u-name" id="user-info"></div>
+                </div>
+            </div>
+            <div class="nav-list">
+                <!-- 1. TỔNG QUAN -->
+                <div class="nav-group">
+                    <div class="nav-group-header" onclick="toggleNavGroup(this)">
+                        <span data-lang="grp_tong_quan"><span class="grp-icon">📊</span>Tổng Quan</span>
+                        <span class="grp-arrow">▶</span>
+                    </div>
+                    <div class="nav-group-body">
+                        <div class="nav-item" id="nav-dashboard" onclick="switchTab('dashboard')" data-lang="nav_1">1.
+                            Dashboard</div>
+                    </div>
+                </div>
+
+                <!-- 2. THẺ KỸ NĂNG -->
+                <div class="nav-group">
+                    <div class="nav-group-header" onclick="toggleNavGroup(this)">
+                        <span data-lang="grp_the_ky_nang" style="flex:1;"><span class="grp-icon">🎴</span>Thẻ Kỹ
+                            Năng</span>
+                        <span class="nav-badge" id="badge-grp-thekynang"
+                            style="display:none; margin-right:10px;">0</span>
+                        <span class="grp-arrow">▶</span>
+                    </div>
+                    <div class="nav-group-body">
+                        <div class="nav-item" id="nav-nhap-the" onclick="switchTab('nhap-the')" data-lang="nav_2">1.
+                            Nhập Thẻ</div>
+                        <div class="nav-item" id="nav-chinh-sua" onclick="switchTab('chinh-sua')" data-lang="nav_3">2.
+                            Chỉnh Sửa</div>
+                        <div class="nav-item" id="nav-in-the" onclick="switchTab('in-the')" data-lang="nav_4">3. In Thẻ
+                        </div>
+                        <div class="nav-item" id="nav-yeu-cau-cap-the" onclick="switchTab('yeu-cau-cap-the')"><span data-lang="nav_ycct">4. Yêu Cầu Cấp Thẻ</span> <span class="nav-badge" id="badge-yeucaucapthe" style="display:none; margin-left:auto; background:#dc3545; color:#fff;">0</span></div>
+
+                    </div>
+                </div>
+
+                <!-- 3. DỮ LIỆU -->
+                <div class="nav-group">
+                    <div class="nav-group-header" onclick="toggleNavGroup(this)">
+                        <span data-lang="grp_du_lieu" style="flex:1;"><span class="grp-icon">📁</span>Dữ Liệu</span>
+                        <span class="nav-badge" id="badge-grp-dulieu" style="display:none; margin-right:10px;">0</span>
+                        <span class="grp-arrow">▶</span>
+                    </div>
+                    <div class="nav-group-body">
+                        <div class="nav-item" id="nav-nghi-viec" onclick="switchTab('nghi-viec')"><span
+                                data-lang="nav_5">1. Nghỉ Việc</span> <span class="nav-badge" id="badge-nghiviec"
+                                style="display:none;">0</span></div>
+                        <div class="nav-item" id="nav-dulieu" onclick="switchTab('dulieu')" data-lang="nav_6">2. Dữ Liệu
+                        </div>
+                        <div class="nav-item" id="nav-tra-cuu-mathe" onclick="switchTab('tra-cuu-mathe')"
+                            data-lang="nav_tcmt">3. Tra Cứu Mã Thẻ</div>
+                        <div class="nav-item" id="nav-tai-du-lieu" onclick="switchTab('tai-du-lieu')"
+                            data-lang="nav_tai_du_lieu">4. Tải Dữ Liệu</div>
+                        <div class="nav-item" id="nav-thong-tin-dia-chi" onclick="switchTab('thong-tin-dia-chi')"
+                            data-lang="nav_thong_tin_dia_chi">
+                            5. Thông Tin Địa Chỉ
+                        </div>
+                        <div class="nav-item" id="nav-gg-dich" onclick="switchTab('gg-dich')"
+                            data-lang="nav_gg_dich">
+                            6. Google Dịch
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3B. CHẤM CÔNG-THƯỞNG -->
+                <div class="nav-group">
+                    <div class="nav-group-header" onclick="toggleNavGroup(this)">
+                        <span data-lang="grp_cham_cong"><span class="grp-icon">⏰</span>Chấm Công-Thưởng</span>
+                        <span class="grp-arrow">▶</span>
+                    </div>
+                    <div class="nav-group-body">
+                        <div class="nav-item" id="nav-diem-danh" onclick="switchTab('diem-danh')"
+                            data-lang="nav_diem_danh">1. Điểm Danh</div>
+                        <div class="nav-item" id="nav-loi-ctq" onclick="switchTab('loi-ctq')" data-lang="nav_loi_ctq">2.
+                            Lỗi CTQ</div>
+                        <div class="nav-item" id="nav-bao-chuyen-can" onclick="switchTab('bao-chuyen-can')"
+                            data-lang="nav_bao_cc">3. Báo Chuyên Cần</div>
+                        <div class="nav-item" id="nav-thong-tin-tram" onclick="switchTab('thong-tin-tram')"
+                            data-lang="nav_ttt">4. Thông Tin Trạm</div>
+                        <div class="nav-item" id="nav-theo-doi-cong-nhan" onclick="switchTab('theo-doi-cong-nhan')"
+                            data-lang="nav_tdcn">5. Theo Dõi Công Nhân</div>
+                    </div>
+                </div>
+
+                <!-- 4. Điểm Mù -->
+                <div class="nav-group">
+                    <div class="nav-group-header" onclick="toggleNavGroup(this)">
+                        <span data-lang="grp_diem_mu"><span class="grp-icon">⚠️</span>Điểm Mù</span>
+                        <span class="grp-arrow">▶</span>
+                    </div>
+                    <div class="nav-group-body">
+                        <div class="nav-item" id="nav-diem-mu" onclick="switchTab('diem-mu')" data-lang="nav_7">1. Nhập
+                            Điểm Mù</div>
+                        <div class="nav-item" id="nav-xac-nhan-loi" onclick="switchTab('xac-nhan-loi')"
+                            data-lang="nav_xac_nhan_loi">2. Xác Nhận Lỗi</div>
+                        <div class="nav-item" id="nav-giao-vien" onclick="switchTab('giao-vien')" data-lang="nav_11">3.
+                            Giáo Viên</div>
+                        <div class="nav-item" id="nav-kiem-tra" onclick="switchTab('kiem-tra')"
+                            data-lang="nav_kiem_tra">4. Kiểm Tra</div>
+                        <div class="nav-item" id="nav-xep-hang" onclick="switchTab('xep-hang')"
+                            data-lang="nav_xep_hang">5. Xếp Hạng</div>
+                        <div class="nav-item" id="nav-tra-cuu" onclick="switchTab('tra-cuu')" data-lang="nav_17">6. Tra
+                            Cứu</div>
+                        <div class="nav-item" id="nav-diem-mu-tuan" onclick="switchTab('diem-mu-tuan')"
+                            data-lang="nav_18">7. Điểm Mù Tuần</div>
+                        <div class="nav-item" id="nav-phan-tich" onclick="switchTab('phan-tich')"
+                            data-lang="nav_phan_tich">8. Phân Tích</div>
+                    </div>
+                </div>
+
+                <!-- 5. QUẢN LÝ -->
+                <div class="nav-group">
+                    <div class="nav-group-header" onclick="toggleNavGroup(this)">
+                        <span data-lang="grp_quan_ly_ctq"><span class="grp-icon">⚙️</span>Quản Lý</span>
+                        <span class="grp-arrow">▶</span>
+                    </div>
+                    <div class="nav-group-body">
+                        <div class="nav-item" id="nav-nop-lon" onclick="switchTab('nop-lon')" data-lang="nav_15">2. Nộp
+                            Lợn</div>
+                        <div class="nav-item" id="nav-quy" onclick="switchTab('quy')" data-lang="nav_16">3. Quản Lý Quỹ
+                        </div>
+                        <div class="nav-item" id="nav-tien-do-ctq" onclick="switchTab('tien-do-ctq')"
+                            data-lang="nav_tien_do_ctq">4. Tiến Độ CTQ</div>
+                        <div class="nav-item" id="nav-ds-da-cong-doan" onclick="switchTab('ds-da-cong-doan')"
+                            data-lang="nav_dcd">5. DS Đa Công Đoạn</div>
+
+                        <div class="nav-item" id="nav-pass-tram" onclick="switchTab('pass-tram')"
+                            data-lang="nav_pass_tram">6. Pass Trạm</div>
+                        <div class="nav-item" id="nav-phan-tich-loi" onclick="switchTab('phan-tich-loi')"
+                            data-lang="nav_phan_tich_loi">7. Phân Tích Lỗi</div>
+                        <div class="nav-item" id="nav-du-lieu-tram-ctq" onclick="switchTab('du-lieu-tram-ctq')"
+                            data-lang="nav_du_lieu_tram_ctq">8. Dữ Liệu Trạm CTQ</div>
+                        <div class="nav-item" id="nav-copy-thuong" onclick="switchTab('copy-thuong')">9. COPY THƯỞNG
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 6. LỊCH LÀM VIỆC -->
+                <div class="nav-group">
+                    <div class="nav-group-header" onclick="toggleNavGroup(this)">
+                        <span data-lang="grp_lich_lam_viec"><span class="grp-icon">📅</span>Lịch Làm Việc</span>
+                        <span class="grp-arrow">▶</span>
+                    </div>
+                    <div class="nav-group-body">
+                        <div class="nav-item" id="nav-ke-hoach" onclick="switchTab('ke-hoach')" data-lang="nav_20">1. Kế
+                            Hoạch</div>
+                        <div class="nav-item" id="nav-bang-luong" onclick="switchTab('bang-luong')" data-lang="nav_22">
+                            2. Bảng Lương</div>
+                        <div class="nav-item" id="nav-quay-so" onclick="switchTab('quay-so')" data-lang="nav_quay_so">3.
+                            Quay Số</div>
+                    </div>
+                </div>
+
+                <!-- 6. KIỂM TRA -->
+                <div class="nav-group">
+                    <div class="nav-group-header" onclick="toggleNavGroup(this)">
+                        <span data-lang="grp_kiem_tra"><span class="grp-icon">🔍</span>Kiểm Tra</span>
+                        <span class="grp-arrow">▶</span>
+                    </div>
+                    <div class="nav-group-body">
+                        <div class="nav-item" id="nav-kiem-tra-the" onclick="openKiemTraTheModal()">1. Kiểm Tra Thẻ
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 7. CÀI ĐẶT -->
+                <div class="nav-group">
+                    <div class="nav-group-header" onclick="toggleNavGroup(this)">
+                        <span data-lang="grp_cai_dat"><span class="grp-icon">🛠️</span>Cài Đặt</span>
+                        <span class="grp-arrow">▶</span>
+                    </div>
+                    <div class="nav-group-body">
+                        <div class="nav-item" id="nav-admin" onclick="switchTab('admin')" data-lang="nav_admin">1. Admin
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="sidebar-footer">
+                <button class="btn"
+                    style="background:var(--warning); color:#000; font-size:14px; margin-bottom:10px; height:38px;"
+                    onclick="document.getElementById('change-pass-modal').style.display='flex'"
+                    data-lang="cp_btn_nav">Đổi Mật Khẩu</button>
+                <button class="btn" style="background:var(--danger); color:#fff; font-size:14px; height:38px;"
+                    onclick="logout()" data-lang="logout">Đăng Xuất</button>
+                <div class="app-v" style="margin-top:15px; font-size:12px; color:rgba(255,255,255,0.5);">V1.2.0 MOBILE
+                    MAX</div>
+            </div>
+        </div>
+
+        <div class="content-area">
+            <div class="topbar">
+                <button class="mobile-menu-btn" onclick="toggleSidebar()">☰</button>
+                <div style="flex:1; margin: 0 20px; overflow: hidden; display: flex; align-items: center; position: relative; min-height: 30px;"
+                    class="sys-marquee-container">
+                    <style>
+                        @keyframes marqueeScroll {
+                            0% {
+                                transform: translateX(100vw);
+                            }
+
+                            100% {
+                                transform: translateX(-100%);
+                            }
+                        }
+                    </style>
+                    <div id="sys-marquee"
+                        style="color: red; font-size: 16px; font-weight: 900; display: none; text-transform: uppercase; white-space: nowrap; text-shadow: 0 2px 4px rgba(0,0,0,0.2); position: absolute; animation: marqueeScroll 20s linear infinite;">
+                    </div>
+                </div>
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <button class="lang-btn" id="lang-btn" onclick="toggleLang()">🌐 VN</button>
+                    <button id="btn-exit-program" onclick="exitActiveProgram()" title="Thoát chương trình"
+                        style="background:linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color:#ffffff; border:none; border-radius:50%; width:34px; height:34px; font-size:18px; font-weight:900; cursor:pointer; display:flex; align-items:center; justify-content:center; box-shadow:0 3px 8px rgba(239,68,68,0.4); transition:all 0.2s;"
+                        onmouseover="this.style.transform='scale(1.15)'; this.style.boxShadow='0 4px 12px rgba(239,68,68,0.6)';"
+                        onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 3px 8px rgba(239,68,68,0.4)';">✕</button>
+                </div>
+            </div>
+            <div class="workspace" onclick="closeSidebarOnMobile()">
+
+                <div id="loader" class="loader-wrap">
+                    <div class="loader-spinner"></div>
+                    <div class="loader-txt" data-lang="wait_msg">Chờ Một Chút Để Hệ Thống Xử Lý, Cảm Ơn Bạn!</div>
+                </div>
+
+                <div id="standard-view">
+                    <div class="app-card"
+                        style="min-height:75vh; border:none; box-shadow:none; padding:0; background:transparent;">
+                        <div class="app-card-title" id="page-title" data-lang="nav_1" style="font-size:24px;">1.
+                            Dashboard</div>
+                        <div id="app-content">
+                            <div id="tab-dashboard" class="tab-container" style="display:none;"></div>
+                            <div id="tab-nhap-the" class="tab-container" style="display:none;"></div>
+                            <div id="tab-chinh-sua" class="tab-container" style="display:none;"></div>
+                            <div id="tab-in-the" class="tab-container" style="display:none;"></div>
+                            <div id="tab-yeu-cau-cap-the" class="tab-container" style="display:none;"></div>
+                            <div id="tab-nghi-viec" class="tab-container" style="display:none;"></div>
+                            <div id="tab-dulieu" class="tab-container" style="display:none;"></div>
+                            <div id="tab-cap-the" class="tab-container" style="display:none;"></div>
+                            <div id="tab-nop-lon-view" class="tab-container" style="display:none;"></div>
+                            <div id="tab-admin" class="tab-container" style="display:none;"></div>
+                            <div id="tab-nop-lon" class="tab-container" style="display:none;"></div>
+                            <div id="tab-xac-nhan-loi" class="tab-container" style="display:none;"></div>
+
+                            <div id="tab-giao-vien" class="tab-container" style="display:none;"></div>
+                            <div id="tab-quy" class="tab-container" style="display:none;"></div>
+                            <div id="tab-phan-tich" class="tab-container" style="display:none;"></div>
+                            <div id="tab-kiem-tra" class="tab-container" style="display:none;"></div>
+                            <div id="tab-xep-hang" class="tab-container" style="display:none;"></div>
+                            <div id="tab-tra-cuu" class="tab-container" style="display:none;"></div>
+                            <div id="tab-diem-mu-tuan" class="tab-container" style="display:none;"></div>
+                            <div id="tab-quay-so" class="tab-container" style="display:none;"></div>
+                            <div id="tab-ke-hoach" class="tab-container" style="display:none;"></div>
+                            <div id="tab-tien-do-ctq" class="tab-container" style="display:none;"></div>
+                            <div id="tab-ds-da-cong-doan" class="tab-container" style="display:none;"></div>
+                            <div id="tab-bang-luong" class="tab-container" style="display:none;"></div>
+                            <div id="tab-kiem-tra-the" class="tab-container" style="display:none;"></div>
+                            <div id="tab-diem-danh" class="tab-container" style="display:none;"></div>
+                            <div id="tab-loi-ctq" class="tab-container" style="display:none;"></div>
+                            <div id="tab-bao-chuyen-can" class="tab-container" style="display:none;"></div>
+                            <div id="tab-thong-tin-tram" class="tab-container" style="display:none;"></div>
+                            <div id="tab-theo-doi-cong-nhan" class="tab-container" style="display:none;"></div>
+                            <div id="tab-du-lieu-tram-ctq" class="tab-container" style="display:none;"></div>
+                            <div id="tab-copy-thuong" class="tab-container" style="display:none;"></div>
+                            <div id="tab-tra-cuu-mathe" class="tab-container" style="display:none;"></div>
+                            <div id="tab-da-cong-doan" class="tab-container" style="display:none;"></div>
+                            <div id="tab-pass-tram" class="tab-container" style="display:none;"></div>
+                            <div id="tab-phan-tich-loi" class="tab-container" style="display:none;"></div>
+                            <div id="tab-tai-du-lieu" class="tab-container" style="display:none;"></div>
+                            <div id="tab-thong-tin-dia-chi" class="tab-container" style="display:none;"></div>
+                            <div id="tab-gg-dich" class="tab-container" style="display:none;"></div>
+                        </div>
+                    </div>
+                </div>
+                <div id="diem-mu-view" class="tab-container" style="display:none;"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="app-modal">
+        <div class="modal-content" style="width: 98vw; max-width: 1800px; height: 95vh;">
+            <div class="modal-close print-hide" onclick="document.getElementById('app-modal').style.display='none'">
+                &times;</div>
+            <div class="app-card-title print-hide"
+                style="margin:15px; font-size:20px; border-bottom: 2px solid #eee; padding-bottom: 10px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+                <span id="modal-title" data-lang="modal_detail">Chi Tiết</span>
+                <div style="display:flex; gap:8px; width:100%; max-width:550px; align-items:center;">
+                    <button class="action-btn red" id="btn-delete-selected-modal"
+                        style="white-space:nowrap; background:#dc2626; color:#fff; font-weight:800; display:none;"
+                        onclick="deleteSelectedModalRows()">🗑️ XÓA ĐÃ CHỌN (<span
+                            id="modal-selected-count">0</span>)</button>
+                    <input type="text" id="modal-search" class="app-input" style="flex:1; margin:0; min-width:150px;"
+                        placeholder="Nhập mã thẻ..." onkeyup="filterModalTable()">
+                    <button class="action-btn green" style="white-space:nowrap;" onclick="exportModalToExcel()">⬇️
+                        EXCEL</button>
+                    <button class="action-btn purple" style="white-space:nowrap;" onclick="window.print()">🖨️ IN
+                        BẢNG</button>
+                </div>
+            </div>
+            <div class="modal-body" id="modal-body" style="padding-top:0;"></div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="card-modal">
+        <div class="modal-content"
+            style="width:95vw; max-width:750px; height:auto; padding:20px; background:#e9ecef; overflow-y:auto;">
+            <div class="modal-close" onclick="document.getElementById('card-modal').style.display='none'">&times;</div>
+            <div id="card-preview-body"></div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="faca-modal">
+        <div class="modal-content" style="width:95vw; max-width:800px; height:auto; padding:20px; overflow-y:auto;">
+            <div class="modal-close" onclick="document.getElementById('faca-modal').style.display='none'">&times;</div>
+            <div class="app-card-title"
+                style="margin:0 0 15px 0; font-size:20px; border-bottom: 2px solid #eee; padding-bottom: 10px;">
+                <span>THÔNG TIN CẢI TIẾN (FACA)</span>
+            </div>
+            <div id="faca-modal-body"></div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="auth-faca-modal">
+        <div class="modal-content"
+            style="width:98vw; max-width:800px; height:auto; padding:0; overflow:hidden; border-radius:12px; box-shadow:0 10px 30px rgba(0,0,0,0.2);">
+            <div
+                style="background:#f8f9fa; padding:20px 25px; border-bottom:1px solid #dee2e6; display:flex; justify-content:space-between; align-items:center;">
+                <h3 style="margin:0; color:var(--primary); font-weight:900; font-size:18px;">XÁC NHẬN LỖI / 不良确认</h3>
+                <div class="modal-close"
+                    style="position:static; margin:0; width:30px; height:30px; display:flex; justify-content:center; align-items:center; background:#e9ecef; border-radius:50%;"
+                    onclick="document.getElementById('auth-faca-modal').style.display='none'">&times;</div>
+            </div>
+            <div style="padding:30px;">
+                <div style="text-align:center; margin-bottom:20px;">
+                    <p style="color:var(--danger); font-weight:bold; font-size:18px; margin-bottom:5px;"
+                        id="auth-faca-subtitle" data-lang="faca_auth_subtitle">Xác nhận lỗi...</p>
+                    <p style="color:blue; font-size:14px; font-weight:bold;" data-lang="faca_auth_desc">Yêu Cầu: Viết FA
+                        CA Đầy Đủ, Không Xác Nhận
+                        Lỗi Sẽ Tự Động Gửi Gmail Các Sếp</p>
+                </div>
+
+                <input type="hidden" id="auth-faca-row-index">
+                <input type="hidden" id="auth-faca-status-val">
+
+                <div class="form-group" style="margin-bottom:15px;">
+                    <label style="font-weight:bold; font-size:13px; margin-bottom:5px; display:block;"
+                        data-lang="faca_user_label">Tên đăng nhập /
+                        登录名:</label>
+                    <input type="text" id="auth-faca-user" class="app-input" style="margin-bottom:0;"
+                        placeholder="TÊN ĐĂNG NHẬP / 登录名">
+                </div>
+
+                <div class="form-group" style="margin-bottom:15px;">
+                    <label style="font-weight:bold; font-size:13px; margin-bottom:5px; display:block;">Mật khẩu /
+                        密码:</label>
+                    <input type="password" id="auth-faca-pass" class="app-input" style="margin-bottom:0;"
+                        placeholder="MẬT KHẨU / 密码" data-lang-placeholder="faca_pass_ph">
+                </div>
+
+                <div class="form-group" style="margin-bottom:15px;">
+                    <label style="font-weight:bold; font-size:13px; margin-bottom:5px; display:block;">VIẾT FACA / 填写
+                        FACA:</label>
+                    <textarea id="auth-faca-text" class="app-input"
+                        style="height:100px; resize:vertical; margin-bottom:0;"
+                        placeholder="NHẬP FACA BẮT BUỘC... / 必填 FACA..."
+                        data-lang-placeholder="faca_note_ph"></textarea>
+                </div>
+
+                <div class="form-group"
+                    style="margin-bottom:20px; background:#f8f9fa; padding:15px; border-radius:8px; border:1px dashed #ced4da;">
+                    <label style="font-weight:bold; font-size:13px; margin-bottom:10px; display:block;">Đính Kèm Ảnh Đào
+                        Tạo / 附加确认图片:</label>
+                    <input type="file" id="auth-faca-file" accept="image/*" style="width:100%; font-size:13px;">
+                </div>
+
+                <div style="display:flex; justify-content:center; gap:15px;">
+                    <button class="action-btn blue" style="min-width:120px;" onclick="submitAuthFaca()">Xác nhận /
+                        确认</button>
+                    <button class="action-btn" style="background:#6c757d; min-width:120px;"
+                        onclick="document.getElementById('auth-faca-modal').style.display='none'">Hủy bỏ / 取消</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+
+    </div>
+
+    <!-- KIỂM TRA THẺ MODAL -->
+    <div class="modal-overlay" id="kiem-tra-the-modal"
+        style="display:none; z-index:99999; background: rgba(0,0,0,0.8);">
+        <div class="modal-content"
+            style="width: 100vw; height: 100vh; max-width: 100vw; max-height: 100vh; border-radius:0; padding:0; display:flex; flex-direction:column; background:#fff;">
+            <div
+                style="padding: 10px 20px; border-bottom: 1px solid #eee; display:flex; justify-content:space-between; align-items:center; flex-wrap: wrap; gap: 10px;">
+                <div style="font-size: 14px; font-weight: 900; color: #777; letter-spacing: 1px;">🚀 HỆ THỐNG QUẢN LÝ
+                    THẺ CTQ</div>
+                <button onclick="document.getElementById('kiem-tra-the-modal').style.display='none'"
+                    style="background:none; border:none; border:1px solid #ff4d4f; color:#ff4d4f; padding:5px 15px; font-weight:bold; cursor:pointer; font-size:14px; display:flex; align-items:center; gap:5px;">&times;
+                    ĐÓNG</button>
+            </div>
+            <div
+                style="padding: 15px 20px; display:flex; justify-content:space-between; align-items:center; border-bottom: 2px solid #ffc107; flex-wrap: wrap; gap: 10px;">
+                <div
+                    style="font-size: 20px; font-weight: 900; color: #d97706; display:flex; align-items:center; gap:8px;">
+                    ⚡ KIỂM TRA THẺ KỸ NĂNG HÀNG LOẠT</div>
+                <div style="display:flex; gap:10px;">
+                    <button
+                        style="background:#ff4d4f; color:#fff; border:none; padding:8px 15px; font-weight:bold; cursor:pointer; border-radius:4px; font-size:13px;"
+                        onclick="kiemTraTheClearData()">🗑️ XÓA LÀM LẠI</button>
+                    <button
+                        style="background:#00b96b; color:#fff; border:none; padding:8px 15px; font-weight:bold; cursor:pointer; border-radius:4px; font-size:13px;"
+                        onclick="alert('Dữ liệu tự động tính ngay khi dán. Nút này để minh họa!')">🚀 BẤM KIỂM
+                        TRA</button>
+                </div>
+            </div>
+            <div style="padding: 10px 20px; font-size: 13px; font-style: italic; color: #333; font-weight:bold;">
+                * Hướng dẫn: Copy dữ liệu 4 cột (Tên Trạm, Ca, Line, Mã Thẻ) từ Excel -> Click chuột vào ô đầu tiên của
+                bảng dưới đây -> Nhấn Ctrl + V để dán.
+            </div>
+            <div class="table-container" style="flex:1; overflow:auto; padding: 0 20px 20px 20px;">
+                <table class="app-table" id="ktt-table"
+                    style="width:100%; min-width:1000px; border-collapse: collapse;">
+                    <thead style="position:sticky; top:0; z-index:10; background:#ffc107; color:#000;">
+                        <tr>
+                            <th
+                                style="padding:10px; border:1px solid #e0a800; font-size:13px; text-align:center; width:25%;">
+                                TÊN TRẠM</th>
+                            <th
+                                style="padding:10px; border:1px solid #e0a800; font-size:13px; text-align:center; width:4%;">
+                                CA</th>
+                            <th
+                                style="padding:10px; border:1px solid #e0a800; font-size:13px; text-align:center; width:6%;">
+                                LINE</th>
+                            <th
+                                style="padding:10px; border:1px solid #e0a800; font-size:13px; text-align:center; width:10%;">
+                                MÃ NGỒI HÔM NAY</th>
+                            <th
+                                style="padding:10px; border:1px solid #e0a800; font-size:13px; text-align:center; width:15%;">
+                                TRẠM 1</th>
+                            <th
+                                style="padding:10px; border:1px solid #e0a800; font-size:13px; text-align:center; width:15%;">
+                                TRẠM 2</th>
+                            <th
+                                style="padding:10px; border:1px solid #e0a800; font-size:13px; text-align:center; width:15%;">
+                                TRẠM 3</th>
+                            <th
+                                style="padding:10px; border:1px solid #e0a800; font-size:13px; text-align:center; width:10%;">
+                                KẾT QUẢ KIỂM TRA</th>
+                        </tr>
+                    </thead>
+                    <tbody id="ktt-tbody">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <style>
+        #ktt-table td {
+            padding: 0;
+            border: 1px solid #dee2e6;
+        }
+
+        #ktt-table td input {
+            width: 100%;
+            min-width: 0;
+            box-sizing: border-box;
+            border: none;
+            outline: none;
+            font-size: 14px;
+            text-align: center;
+            font-weight: 900;
+            color: var(--primary);
+            padding: 10px 5px;
+            background: transparent;
+        }
+
+        #ktt-table td input:focus {
+            background: #f1f8ff;
+            box-shadow: inset 0 0 0 2px #0d6efd;
+        }
+
+        .ktt-res-none {
+            color: red;
+            font-weight: 900;
+        }
+
+        .ktt-res-ok {
+            color: green;
+            font-weight: 900;
+        }
+
+        .ktt-res-wrong {
+            color: #d97706;
+            font-weight: 900;
+        }
+    </style>
+
+    <!-- LOCK MODAL -->
+    <div id="lock-modal"
+        style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:999999; justify-content:center; align-items:center; backdrop-filter:blur(8px);">
+        <div
+            style="background:#fff; border-radius:20px; padding:40px; max-width:500px; width:90%; text-align:center; box-shadow:0 20px 50px rgba(0,0,0,0.5); transform:scale(0.9); animation: modalPop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; border-top: 8px solid var(--danger);">
+            <div
+                style="width:80px; height:80px; border-radius:50%; background:#ffeeee; color:var(--danger); display:flex; justify-content:center; align-items:center; margin: 0 auto 20px auto;">
+                <svg viewBox="0 0 24 24" width="40" height="40" stroke="currentColor" stroke-width="2" fill="none">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                </svg>
+            </div>
+            <h2
+                style="color:var(--danger); font-size:28px; font-weight:900; margin-bottom:15px; text-transform:uppercase;">
+                Tài Khoản Đã Bị Khóa!</h2>
+            <div style="font-size:18px; color:#333; font-weight:bold; margin-bottom:10px; line-height:1.5;">
+                Lý do khóa: <span id="lock-modal-reason" style="color:var(--danger);">Vi phạm nội quy</span>
+            </div>
+            <div style="font-size:18px; color:#555; font-weight:bold; margin-bottom:30px;">
+                Vui lòng quay lại sau: <span id="lock-modal-time"
+                    style="color:#f59e0b; font-size:24px; font-weight:900; display:inline-block; margin: 0 5px;">5</span>
+                phút.
+            </div>
+            <button class="action-btn red"
+                style="width:100%; padding:15px; font-size:18px; font-weight:900; border-radius:10px;"
+                onclick="closeLockModal()">ĐÓNG VÀ QUAY LẠI</button>
+        </div>
+    </div>
+    <style>
+        @keyframes modalPop {
+            0% {
+                transform: scale(0.8);
+                opacity: 0;
+            }
+
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+    </style>
+
+    <!-- MODAL THÔNG BÁO CÂU TRẢ LỜI MỚI (LIÊN HỆ CTQ) -->
+    <div class="modal-overlay" id="lh-noti-modal" style="display:none; z-index:99999;">
+        <div class="modal-content" style="max-width:500px; text-align:center; padding:30px;">
+            <div style="font-size:50px; margin-bottom:15px;">📬</div>
+            <h3 style="color:var(--primary); font-weight:900; margin-bottom:15px; font-size:22px; text-transform:uppercase;"
+                data-lang="lh_noti_title">BẠN CÓ CÂU TRẢ LỜI MỚI</h3>
+            <p style="color:#555; font-size:16px; margin-bottom:20px; line-height:1.5;" data-lang="lh_noti_desc">
+                Câu hỏi của bạn gửi đến bộ phận <b>CTQ</b> đã được phản hồi. Vui lòng vào trang <b>Liên Hệ Nhóm CTQ</b>
+                để xem chi tiết!
+            </p>
+            <div
+                style="background:#f8f9fa; padding:15px; border-radius:8px; margin-bottom:20px; border-left:4px solid var(--accent); text-align:left;">
+                <div style="font-weight:bold; color:#555; font-size:13px; margin-bottom:5px;">Câu Hỏi:</div>
+                <div id="lh-noti-q" style="font-size:15px; color:#111; font-weight:600; margin-bottom:10px;">...</div>
+                <div style="font-weight:bold; color:#555; font-size:13px; margin-bottom:5px;">Trả Lời:</div>
+                <div id="lh-noti-a" style="font-size:15px; color:#003823; font-weight:bold; white-space:pre-wrap;">...
+                </div>
+            </div>
+            <button class="action-btn blue"
+                style="width:100%; padding:15px; font-size:18px; font-weight:900; border-radius:10px;"
+                onclick="closeLhNotiModal()" data-lang="lh_btn_ok">ĐÃ HIỂU VÀ ĐÓNG</button>
+        </div>
+    </div>
+
+    <script>
+        let currentLhNotiId = null;
+        window.isShowingLhNoti = false;
+        function checkLienHeNotifications() {
+            if (!CURRENT_USER || CURRENT_USER === 'admin') return;
+            if (window.isShowingLhNoti) return;
+            google.script.run.withSuccessHandler(data => {
+                if (data && data.length > 0) {
+                    let unread = data.filter(item =>
+                        String(item.maThe).trim().toUpperCase() === String(CURRENT_USER).trim().toUpperCase() &&
+                        item.traLoi &&
+                        (item.daXem === false || String(item.daXem).trim().toUpperCase() === 'FALSE')
+                    );
+                    if (unread.length > 0) {
+                        let latest = unread[0];
+                        currentLhNotiId = latest.id;
+                        document.getElementById('lh-noti-q').innerText = latest.cauHoi;
+                        document.getElementById('lh-noti-a').innerText = latest.traLoi;
+                        document.getElementById('lh-noti-modal').style.display = 'flex';
+                        window.isShowingLhNoti = true;
+                    }
+                }
+            }).getLienHeData();
+        }
+
+        function closeLhNotiModal() {
+            if (currentLhNotiId) {
+                google.script.run.markLienHeAsSeen(currentLhNotiId);
+            }
+            document.getElementById('lh-noti-modal').style.display = 'none';
+            window.isShowingLhNoti = false;
+        }
+    </script>
+
+    <script>
+        window.onerror = function (msg, url, lineNo, columnNo, error) {
+            alert('Global Error: ' + msg + '\nLine: ' + lineNo);
+            return false;
+        };
+    </script>
+    <?!= include('CTQ2026_core') ?>
+    <?!= include('CTQ2026_modules') ?>
+    <?!= include('CTQ2026_modules2') ?>
+    <?!= include('CTQ2026_phantichloi') ?>
+    <?!= include('CTQ2026_copythuong') ?>
+
+
+
+    <?!= include('CTQ2026_html2canvas') ?>
+    <?!= include('CTQ2026_extra') ?>
+    <?!= include('CTQ2026_calendar') ?>
+    <?!= include('CTQ2026_kanban') ?>
+    <?!= include('CTQ2026_thongtindiachi') ?>
+</body>
+
+</html>
